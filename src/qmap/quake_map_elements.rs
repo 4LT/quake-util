@@ -8,7 +8,7 @@ pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
 
 pub trait QuakeMapElement<W: Write> {
-    fn serialize(&self, writer: &mut W) -> SerializeResult;
+    fn write_to(&self, writer: &mut W) -> SerializeResult;
 }
 
 pub struct QuakeMap {
@@ -16,9 +16,9 @@ pub struct QuakeMap {
 }
 
 impl<W: Write> QuakeMapElement<W> for QuakeMap {
-    fn serialize(&self, writer: &mut W) -> SerializeResult {
+    fn write_to(&self, writer: &mut W) -> SerializeResult {
         for ent in &self.entities {
-            ent.serialize(writer)?;
+            ent.write_to(writer)?;
         }
         Ok(())
     }
@@ -30,17 +30,17 @@ pub enum Entity {
 }
 
 impl<W: Write> QuakeMapElement<W> for Entity {
-    fn serialize(&self, writer: &mut W) -> SerializeResult {
+    fn write_to(&self, writer: &mut W) -> SerializeResult {
         writer.write_all(b"{\r\n")?;
         match self {
             Entity::Brush(edict, brushes) => {
-                edict.serialize(writer)?;
+                edict.write_to(writer)?;
                 for brush in brushes {
-                    brush.serialize(writer)?;
+                    brush.write_to(writer)?;
                 }
             },
             Entity::Point(edict) => {
-                edict.serialize(writer)?;
+                edict.write_to(writer)?;
             }
         }
         writer.write_all(b"}\r\n")?;
@@ -51,7 +51,7 @@ impl<W: Write> QuakeMapElement<W> for Entity {
 pub type Edict = HashMap<Vec<u8>, Vec<u8>>;
 
 impl<W: Write> QuakeMapElement<W> for Edict {
-    fn serialize(&self, writer: &mut W) -> SerializeResult {
+    fn write_to(&self, writer: &mut W) -> SerializeResult {
         for (key, value) in self {
             writer.write_all(b"\"")?;
             writer.write_all(key)?;
@@ -66,11 +66,11 @@ impl<W: Write> QuakeMapElement<W> for Edict {
 pub type Brush = Vec<Surface>;
 
 impl<W: Write> QuakeMapElement<W> for Brush {
-    fn serialize(&self, writer: &mut W) -> SerializeResult {
+    fn write_to(&self, writer: &mut W) -> SerializeResult {
         writer.write_all(b"{\r\n")?;
 
         for surf in self {
-            surf.serialize(writer)?;
+            surf.write_to(writer)?;
             writer.write_all(b"\r\n")?;
         }
 
@@ -86,12 +86,12 @@ pub struct Surface {
 }
 
 impl<W: Write> QuakeMapElement<W> for Surface {
-    fn serialize(&self, writer: &mut W) -> SerializeResult {
-        self.half_space.serialize(writer)?;
+    fn write_to(&self, writer: &mut W) -> SerializeResult {
+        self.half_space.write_to(writer)?;
         writer.write_all(b" ")?;
         writer.write_all(&self.texture)?;
         writer.write_all(b" ")?;
-        self.alignment.serialize(writer)?;
+        self.alignment.write_to(writer)?;
         Ok(())
     }
 }
@@ -129,7 +129,7 @@ impl IndexMut<usize> for HalfSpace {
 }
 
 impl<W: Write> QuakeMapElement<W> for HalfSpace {
-    fn serialize(&self, writer: &mut W) -> SerializeResult {
+    fn write_to(&self, writer: &mut W) -> SerializeResult {
         for (index, pt) in self.iter().enumerate() {
             writer.write_all(b"( ")?;
 
@@ -157,7 +157,7 @@ pub enum Alignment {
 }
 
 impl<W: Write> QuakeMapElement<W> for Alignment {
-    fn serialize(&self, writer: &mut W) -> SerializeResult {
+    fn write_to(&self, writer: &mut W) -> SerializeResult {
         match self {
             Alignment::Standard(base) => {
                 write!(writer,
