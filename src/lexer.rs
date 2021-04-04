@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::io::Read;
@@ -48,14 +47,9 @@ pub fn lex<R: Read>(reader: R) -> VecDeque<Token> {
     let last_byte: Cell<Option<u8>> = Cell::new(None);
     let line_number = Cell::new(1usize);
 
-    let whitespace: HashSet<u8> = [b' ', b'\t', b'\n', b'\r']
-        .iter()
-        .cloned()
-        .collect();
-
     let lex_default = || {
         let byte = byte.get();
-        if !whitespace.contains(&byte) {
+        if !byte.is_ascii_whitespace() {
             if byte == b'"' {
                 state.set(LexerState::Quoted);
                 let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
@@ -109,7 +103,7 @@ pub fn lex<R: Read>(reader: R) -> VecDeque<Token> {
 
     let lex_unquoted = || {
         let byte = byte.get();
-        if whitespace.contains(&byte) {
+        if byte.is_ascii_whitespace() {
             let local_text = text.replace(None).unwrap();
             token_q
                 .borrow_mut()
