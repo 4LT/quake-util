@@ -30,19 +30,10 @@ impl fmt::Display for Token {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-enum LexerState {
-    Default,
-    Comment,
-    MaybeComment,
-    Unquoted,
-    Quoted
-}
-
 struct LexerContext {
     token_q: VecDeque<Token>,
     text: RefCell<Option<Vec<u8>>>,
-    state: LexerState,
+    state: fn(ctx: &mut LexerContext),
     byte: u8,
     last_byte: Option<u8>,
     line_number: usize,
@@ -53,7 +44,7 @@ impl LexerContext {
         LexerContext {
             token_q: VecDeque::new(),
             text: RefCell::new(None),
-            state: LexerState::Default,
+            state: lex_default,
             byte: 0,
             last_byte: None,
             line_number: 1,
@@ -66,14 +57,7 @@ pub fn lex<R: Read>(reader: R) -> std::io::Result<VecDeque<Token>> {
 
     for b in reader.bytes() {
         ctx.byte = b?;
-
-        match ctx.state {
-            LexerState::Default => lex_default(&mut ctx),
-            LexerState::Comment => lex_comment(&mut ctx),
-            LexerState::MaybeComment => lex_maybe_comment(&mut ctx),
-            LexerState::Unquoted => lex_unquoted(&mut ctx),
-            LexerState::Quoted => lex_quoted(&mut ctx)
-        }
+        (ctx.state)(&mut ctx);
 
         if ctx.byte == b'\n' || ctx.last_byte == Some(b'\r') {
             ctx.line_number+= 1;
@@ -95,14 +79,14 @@ pub fn lex<R: Read>(reader: R) -> std::io::Result<VecDeque<Token>> {
 fn lex_default(ctx: &mut LexerContext) {
     if !ctx.byte.is_ascii_whitespace() {
         if ctx.byte == b'"' {
-            ctx.state = LexerState::Quoted;
+            ctx.state = lex_quoted;
             let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
             text_bytes.push(ctx.byte);
             *ctx.text.borrow_mut() = Some(text_bytes);
         } else if ctx.byte == b'/' {
-            ctx.state = LexerState::MaybeComment;
+            ctx.state = lex_maybe_comment;
         } else {
-            ctx.state = LexerState::Unquoted;
+            ctx.state = lex_unquoted;
             let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
             text_bytes.push(ctx.byte);
             *ctx.text.borrow_mut() = Some(text_bytes);
@@ -112,19 +96,19 @@ fn lex_default(ctx: &mut LexerContext) {
 
 fn lex_comment(ctx: &mut LexerContext) {
     if ctx.byte == b'\r' || ctx.byte == b'\n' {
-        ctx.state = LexerState::Default;
+        ctx.state = lex_default;
     }
 }
 
 fn lex_maybe_comment(ctx: &mut LexerContext) {
     if ctx.byte == b'/' {
-        ctx.state = LexerState::Comment;
+        ctx.state = lex_comment;
     } else {
         let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
         text_bytes.push(b'/');
         text_bytes.push(ctx.byte);
         *ctx.text.borrow_mut() = Some(text_bytes);
-        ctx.state = LexerState::Unquoted;
+        ctx.state = lex_unquoted;
     }
 }
 
@@ -136,7 +120,7 @@ fn lex_quoted(ctx: &mut LexerContext) {
             text: local_text,
             line_number: ctx.line_number
         });
-        ctx.state = LexerState::Default;
+        ctx.state = lex_default;
     } 
 }
 
@@ -147,7 +131,7 @@ fn lex_unquoted(ctx: &mut LexerContext) {
             text: local_text,
             line_number: ctx.line_number
         });
-        ctx.state = LexerState::Default;
+        ctx.state = lex_default;
     } else {
         ctx.text.borrow_mut().as_mut().unwrap().push(ctx.byte);
     }
