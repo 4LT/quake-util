@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::fmt;
 use std::io::Read;
 use std::collections::VecDeque;
@@ -39,110 +39,116 @@ enum LexerState {
     Quoted
 }
 
+struct LexerContext {
+    token_q: VecDeque<Token>,
+    text: RefCell<Option<Vec<u8>>>,
+    state: LexerState,
+    byte: u8,
+    last_byte: Option<u8>,
+    line_number: usize,
+}
+
+impl LexerContext {
+    fn new() -> LexerContext {
+        LexerContext {
+            token_q: VecDeque::new(),
+            text: RefCell::new(None),
+            state: LexerState::Default,
+            byte: 0,
+            last_byte: None,
+            line_number: 1,
+        }
+    }
+}
+
 pub fn lex<R: Read>(reader: R) -> std::io::Result<VecDeque<Token>> {
-    let token_q = RefCell::new(VecDeque::new());
-    let text: RefCell<Option<Vec<u8>>> = RefCell::new(None);
-    let state = Cell::new(LexerState::Default);
-    let byte = Cell::new(0u8);
-    let last_byte: Cell<Option<u8>> = Cell::new(None);
-    let line_number = Cell::new(1usize);
-
-    let lex_default = || {
-        let byte = byte.get();
-        if !byte.is_ascii_whitespace() {
-            if byte == b'"' {
-                state.set(LexerState::Quoted);
-                let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-                text_bytes.push(byte);
-                *text.borrow_mut() = Some(text_bytes);
-            } else if byte == b'/' {
-                state.set(LexerState::MaybeComment);
-            } else {
-                state.set(LexerState::Unquoted);
-                let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-                text_bytes.push(byte);
-                *text.borrow_mut() = Some(text_bytes);
-            }
-        }
-    };
-
-    let lex_comment = || {
-        let byte = byte.get();
-        if byte == b'\r' || byte == b'\n' {
-            state.set(LexerState::Default);
-        }
-    };
-
-    let lex_maybe_comment = || {
-        let byte = byte.get();
-        if byte == b'/' {
-            state.set(LexerState::Comment);
-        } else {
-            let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-            text_bytes.push(b'/');
-            text_bytes.push(byte);
-            *text.borrow_mut() = Some(text_bytes);
-            state.set(LexerState::Unquoted);
-        }
-    };
-
-    let lex_quoted = || {
-        let byte = byte.get();
-        text.borrow_mut().as_mut().unwrap().push(byte);
-        if byte == b'"' {
-            let local_text = text.replace(None).unwrap();
-            token_q
-                .borrow_mut()
-                .push_back(Token {
-                    text: local_text,
-                    line_number: line_number.get()
-                });
-            state.set(LexerState::Default);
-        } 
-    };
-
-    let lex_unquoted = || {
-        let byte = byte.get();
-        if byte.is_ascii_whitespace() {
-            let local_text = text.replace(None).unwrap();
-            token_q
-                .borrow_mut()
-                .push_back(Token {
-                    text: local_text,
-                    line_number: line_number.get()
-                });
-            state.set(LexerState::Default)
-        } else {
-            text.borrow_mut().as_mut().unwrap().push(byte);
-        }
-    };
+    let mut ctx = LexerContext::new();
 
     for b in reader.bytes() {
-        byte.set(b?);
+        ctx.byte = b?;
 
-        match state.get() {
-            LexerState::Default => lex_default(),
-            LexerState::Comment => lex_comment(),
-            LexerState::MaybeComment => lex_maybe_comment(),
-            LexerState::Unquoted => lex_unquoted(),
-            LexerState::Quoted => lex_quoted()
+        match ctx.state {
+            LexerState::Default => lex_default(&mut ctx),
+            LexerState::Comment => lex_comment(&mut ctx),
+            LexerState::MaybeComment => lex_maybe_comment(&mut ctx),
+            LexerState::Unquoted => lex_unquoted(&mut ctx),
+            LexerState::Quoted => lex_quoted(&mut ctx)
         }
 
-        if byte.get() == b'\n' || last_byte.get() == Some(b'\r') {
-            line_number.set(line_number.get() + 1);
+        if ctx.byte == b'\n' || ctx.last_byte == Some(b'\r') {
+            ctx.line_number+= 1;
         }
 
-        last_byte.set(Some(byte.get()));
+        ctx.last_byte = Some(ctx.byte);
     }
 
-    if let Some(last_text) = text.replace(None) {
-        token_q
-            .borrow_mut()
-            .push_back(Token {
-                text: last_text,
-                line_number: line_number.get()
-            });
+    if let Some(last_text) = ctx.text.replace(None) {
+        ctx.token_q.push_back(Token {
+            text: last_text,
+            line_number: ctx.line_number
+        });
     }
 
-    Ok(token_q.into_inner())
+    Ok(ctx.token_q)
+}
+
+fn lex_default(ctx: &mut LexerContext) {
+    if !ctx.byte.is_ascii_whitespace() {
+        if ctx.byte == b'"' {
+            ctx.state = LexerState::Quoted;
+            let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
+            text_bytes.push(ctx.byte);
+            *ctx.text.borrow_mut() = Some(text_bytes);
+        } else if ctx.byte == b'/' {
+            ctx.state = LexerState::MaybeComment;
+        } else {
+            ctx.state = LexerState::Unquoted;
+            let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
+            text_bytes.push(ctx.byte);
+            *ctx.text.borrow_mut() = Some(text_bytes);
+        }
+    }
+}
+
+fn lex_comment(ctx: &mut LexerContext) {
+    if ctx.byte == b'\r' || ctx.byte == b'\n' {
+        ctx.state = LexerState::Default;
+    }
+}
+
+fn lex_maybe_comment(ctx: &mut LexerContext) {
+    if ctx.byte == b'/' {
+        ctx.state = LexerState::Comment;
+    } else {
+        let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
+        text_bytes.push(b'/');
+        text_bytes.push(ctx.byte);
+        *ctx.text.borrow_mut() = Some(text_bytes);
+        ctx.state = LexerState::Unquoted;
+    }
+}
+
+fn lex_quoted(ctx: &mut LexerContext) {
+    ctx.text.borrow_mut().as_mut().unwrap().push(ctx.byte);
+    if ctx.byte == b'"' {
+        let local_text = ctx.text.replace(None).unwrap();
+        ctx.token_q.push_back(Token {
+            text: local_text,
+            line_number: ctx.line_number
+        });
+        ctx.state = LexerState::Default;
+    } 
+}
+
+fn lex_unquoted(ctx: &mut LexerContext) {
+    if ctx.byte.is_ascii_whitespace() {
+        let local_text = ctx.text.replace(None).unwrap();
+        ctx.token_q.push_back(Token {
+            text: local_text,
+            line_number: ctx.line_number
+        });
+        ctx.state = LexerState::Default;
+    } else {
+        ctx.text.borrow_mut().as_mut().unwrap().push(ctx.byte);
+    }
 }
