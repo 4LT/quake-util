@@ -39,7 +39,7 @@ enum LexerState {
     Quoted
 }
 
-pub fn lex<R: Read>(reader: R) -> VecDeque<Token> {
+pub fn lex<R: Read>(reader: R) -> std::io::Result<VecDeque<Token>> {
     let token_q = RefCell::new(VecDeque::new());
     let text: RefCell<Option<Vec<u8>>> = RefCell::new(None);
     let state = Cell::new(LexerState::Default);
@@ -118,7 +118,7 @@ pub fn lex<R: Read>(reader: R) -> VecDeque<Token> {
     };
 
     for b in reader.bytes() {
-        byte.set(b.unwrap());
+        byte.set(b?);
 
         match state.get() {
             LexerState::Default => lex_default(),
@@ -144,5 +144,5 @@ pub fn lex<R: Read>(reader: R) -> VecDeque<Token> {
             });
     }
 
-    token_q.into_inner()
+    Ok(token_q.into_inner())
 }

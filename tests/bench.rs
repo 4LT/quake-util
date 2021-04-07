@@ -8,7 +8,7 @@ fn bench_parse() -> std::io::Result<()> {
     let f = File::open("test-res/ad_heresp2.map")?;
     let reader = BufReader::new(f);
 
-    let tokens = lex(reader);
+    let tokens = lex(reader)?;
     let parse_result = parse(tokens); 
     
     match parse_result {
