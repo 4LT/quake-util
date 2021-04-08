@@ -29,11 +29,18 @@ impl ParseError {
     pub fn eof() -> ParseError {
         ParseError{ token: None, message: String::from("Unexpected EOF") }
     }
+}
 
-    pub fn message(&self) -> String {
-        match (&self.token).as_ref() {
-            Some(tok) => format!("Line {}: {}", tok.line_number, self.message),
-            None => self.message.clone()
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.token.as_ref() {
+            Some(tok) => write!(
+                f,
+                "Line {}: {}",
+                tok.line_number,
+                self.message
+            ),
+            None => write!(f, "{}", self.message)
         }
     }
 }
@@ -180,7 +187,7 @@ fn expect_byte(token: Option<&Token>, byte: u8) -> ParseResult<()> {
                 Some(payload.clone()),
                 format!(
                     "Expected `{}`, got `{}`",
-                    byte,
+                    char::from(byte),
                     String::from_utf8_lossy(&payload.text)))),
         _ => Err(ParseError::eof()),
     }

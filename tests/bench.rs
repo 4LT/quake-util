@@ -8,15 +8,17 @@ fn bench_parse() -> std::io::Result<()> {
     let f = File::open("test-res/ad_heresp2.map")?;
     let reader = BufReader::new(f);
 
-    let tokens = lex(reader)?;
-    let parse_result = parse(tokens); 
+    let tokens = match lex(reader) {
+        Ok(tokens) => tokens,
+        Err(err) => panic!("{}", err)
+    };
     
-    match parse_result {
-        Ok(ast) => {
-            ast.write_to(&mut sink())?;
-        },
-        Err(err) => panic!("{}", err.message())
-    }
+    let ast = match parse(tokens) {
+        Ok(ast) => ast,
+        Err(err) => panic!("{}", err)
+    };
+
+    ast.write_to(&mut sink())?;
 
     Ok(())
 }

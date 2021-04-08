@@ -30,6 +30,33 @@ impl fmt::Display for Token {
     }
 }
 
+pub struct TokenError {
+    pub message: String,
+    pub line_number: usize
+}
+
+impl fmt::Display for TokenError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Line {}: {}", self.line_number, self.message)
+    }
+}
+
+pub enum LexerError {
+    Token(TokenError),
+    Io(std::io::Error)
+}
+
+impl fmt::Display for LexerError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LexerError::Token(e) => e.fmt(f),
+            LexerError::Io(e) => e.fmt(f)
+        }
+    }
+}
+
+pub type Result = std::result::Result<VecDeque<Token>, LexerError>;
+
 struct LexerContext {
     token_q: VecDeque<Token>,
     text: RefCell<Option<Vec<u8>>>,
@@ -52,11 +79,11 @@ impl LexerContext {
     }
 }
 
-pub fn lex<R: Read>(reader: R) -> std::io::Result<VecDeque<Token>> {
+pub fn lex<R: Read>(reader: R) -> Result {
     let mut ctx = LexerContext::new();
 
     for b in reader.bytes() {
-        ctx.byte = b?;
+        ctx.byte = b.map_err(LexerError::Io)?;
         (ctx.state)(&mut ctx);
 
         if ctx.byte == b'\n' || ctx.last_byte == Some(b'\r') {
@@ -67,6 +94,13 @@ pub fn lex<R: Read>(reader: R) -> std::io::Result<VecDeque<Token>> {
     }
 
     if let Some(last_text) = ctx.text.replace(None) {
+        if last_text[0] == b'"' && last_text.last() != Some(&b'"') {
+            return Err(LexerError::Token(TokenError {
+                message: String::from("Missing closing quote"),
+                line_number: ctx.line_number
+            }));
+        }
+
         ctx.token_q.push_back(Token {
             text: last_text,
             line_number: ctx.line_number
