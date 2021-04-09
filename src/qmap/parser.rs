@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::str::FromStr;
 
 use crate::qmap::lexer::Token;
-use crate::qmap::quake_map_elements::{
+use crate::qmap::ast::{
     QuakeMap,
     Entity,
     Edict,

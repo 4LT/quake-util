@@ -1,22 +1,21 @@
-use std::io::Write;
+use std::io;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
-pub type SerializeResult = std::io::Result<()>;
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
 
-pub trait QuakeMapElement<W: Write> {
-    fn write_to(&self, writer: &mut W) -> SerializeResult;
+pub trait AstElement<W: io::Write> {
+    fn write_to(&self, writer: &mut W) -> io::Result<()>;
 }
 
 pub struct QuakeMap {
     pub entities: Vec<Entity>
 }
 
-impl<W: Write> QuakeMapElement<W> for QuakeMap {
-    fn write_to(&self, writer: &mut W) -> SerializeResult {
+impl<W: io::Write> AstElement<W> for QuakeMap {
+    fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for ent in &self.entities {
             ent.write_to(writer)?;
         }
@@ -29,8 +28,8 @@ pub enum Entity {
     Point(Edict)
 }
 
-impl<W: Write> QuakeMapElement<W> for Entity {
-    fn write_to(&self, writer: &mut W) -> SerializeResult {
+impl<W: io::Write> AstElement<W> for Entity {
+    fn write_to(&self, writer: &mut W) -> io::Result<()> {
         writer.write_all(b"{\r\n")?;
         match self {
             Entity::Brush(edict, brushes) => {
@@ -50,8 +49,8 @@ impl<W: Write> QuakeMapElement<W> for Entity {
 
 pub type Edict = HashMap<Vec<u8>, Vec<u8>>;
 
-impl<W: Write> QuakeMapElement<W> for Edict {
-    fn write_to(&self, writer: &mut W) -> SerializeResult {
+impl<W: io::Write> AstElement<W> for Edict {
+    fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for (key, value) in self {
             writer.write_all(b"\"")?;
             writer.write_all(key)?;
@@ -65,8 +64,8 @@ impl<W: Write> QuakeMapElement<W> for Edict {
 
 pub type Brush = Vec<Surface>;
 
-impl<W: Write> QuakeMapElement<W> for Brush {
-    fn write_to(&self, writer: &mut W) -> SerializeResult {
+impl<W: io::Write> AstElement<W> for Brush {
+    fn write_to(&self, writer: &mut W) -> io::Result<()> {
         writer.write_all(b"{\r\n")?;
 
         for surf in self {
@@ -85,8 +84,8 @@ pub struct Surface {
     pub alignment: Alignment
 }
 
-impl<W: Write> QuakeMapElement<W> for Surface {
-    fn write_to(&self, writer: &mut W) -> SerializeResult {
+impl<W: io::Write> AstElement<W> for Surface {
+    fn write_to(&self, writer: &mut W) -> io::Result<()> {
         self.half_space.write_to(writer)?;
         writer.write_all(b" ")?;
         writer.write_all(&self.texture)?;
@@ -128,8 +127,8 @@ impl IndexMut<usize> for HalfSpace {
     }
 }
 
-impl<W: Write> QuakeMapElement<W> for HalfSpace {
-    fn write_to(&self, writer: &mut W) -> SerializeResult {
+impl<W: io::Write> AstElement<W> for HalfSpace {
+    fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for (index, pt) in self.iter().enumerate() {
             writer.write_all(b"( ")?;
 
@@ -156,8 +155,8 @@ pub enum Alignment {
     }
 }
 
-impl<W: Write> QuakeMapElement<W> for Alignment {
-    fn write_to(&self, writer: &mut W) -> SerializeResult {
+impl<W: io::Write> AstElement<W> for Alignment {
+    fn write_to(&self, writer: &mut W) -> io::Result<()> {
         match self {
             Alignment::Standard(base) => {
                 write!(writer,

@@ -1,7 +1,7 @@
 use std::io::{BufReader, sink};
 use std::fs::File;
 
-use quake_util::qmap::{ lex, parse, QuakeMapElement };
+use quake_util::qmap::{ lex, parse, AstElement };
 
 #[test]
 fn bench_parse() -> std::io::Result<()> {

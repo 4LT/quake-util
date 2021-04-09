@@ -1,12 +1,12 @@
 pub mod lexer;
 pub mod parser;
-pub mod quake_map_elements;
+pub mod ast;
 
 pub use lexer::{Token, lex};
 pub use parser::{ParseResult, parse};
 
-pub use quake_map_elements::{
-    QuakeMapElement,
+pub use ast::{
+    AstElement,
     QuakeMap,
     Entity,
     Edict,
@@ -19,5 +19,3 @@ pub use quake_map_elements::{
     Vec2,
     Vec3
 };
-
-
