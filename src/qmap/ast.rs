@@ -91,6 +91,15 @@ pub enum Entity {
     Point(Edict),
 }
 
+impl Entity {
+    pub fn edict(&self) -> &Edict {
+        match self {
+            Self::Point(edict) => &edict,
+            Self::Brush(edict, _) => &edict,
+        }
+    }
+}
+
 impl<W: io::Write> Writes<W> for Entity {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         writer.write_all(b"{\r\n")?;
