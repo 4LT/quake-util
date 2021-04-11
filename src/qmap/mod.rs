@@ -6,6 +6,8 @@ pub use lexer::{Token, lex};
 pub use parser::{ParseResult, parse};
 
 pub use ast::{
+    Writes,
+    Validate,
     AstElement,
     QuakeMap,
     Entity,
