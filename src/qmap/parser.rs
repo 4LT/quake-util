@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::str::FromStr;
+use std::num::NonZeroU8;
 
 use crate::qmap::lexer::Token;
 use crate::qmap::ast::{
@@ -77,10 +78,10 @@ fn parse_edict(tokens: &mut VecDeque<Token>) -> ParseResult<Edict> {
 
     while tokens.front().map_or(false, |tok| tok.match_quoted()) {
         let key = strip_quoted(&tokens.pop_front().as_ref().unwrap().text)
-            .into();
+            .to_vec().into();
         let maybe_value = tokens.pop_front();
         expect_quoted(maybe_value.as_ref())?;
-        let value = strip_quoted(&maybe_value.unwrap().text).into();
+        let value = strip_quoted(&maybe_value.unwrap().text).to_vec().into();
         edict.insert(key, value);
     }
 
@@ -116,8 +117,8 @@ fn parse_surface(tokens: &mut VecDeque<Token>) -> ParseResult<Surface> {
 
     let half_space = HalfSpace(pt1, pt2, pt3);
 
-    let texture = Box::from(
-        &unwrap_token(tokens.pop_front().as_ref())?.text[..]);
+    let texture = unwrap_token(tokens.pop_front().as_ref())?.text.clone()
+        .into();
 
     let alignment = if tokens.front().map_or(false, |tok| tok.match_byte(b'[')) {
         parse_valve_alignment(tokens)?
@@ -190,7 +191,7 @@ fn expect_byte(token: Option<&Token>, byte: u8) -> ParseResult<()> {
                 format!(
                     "Expected `{}`, got `{}`",
                     char::from(byte),
-                    String::from_utf8_lossy(&payload.text)))),
+                    payload.text_as_string()))),
         _ => Err(ParseError::eof()),
     }
 }
@@ -202,7 +203,7 @@ fn expect_quoted(token: Option<&Token>) -> ParseResult<()> {
                 Some(payload.clone()),
                 format!(
                     "Expected quoted, got `{}`",
-                    String::from_utf8_lossy(&payload.text)))),
+                    payload.text_as_string()))),
         _ => Err(ParseError::eof()),
     }
 }
@@ -210,14 +211,14 @@ fn expect_quoted(token: Option<&Token>) -> ParseResult<()> {
 fn expect_float(token: Option<&Token>) -> ParseResult<f64> {
     match token {
         Some(payload) =>
-            match f64::from_str(&String::from_utf8_lossy(&payload.text)) {
+            match f64::from_str(&payload.text_as_string()) {
                 Ok(num) => Ok(num),
                 Err(_) => {
                     Err(ParseError::new(
                         Some(payload.clone()),
                         format!(
                             "Expected number, got `{}`",
-                            String::from_utf8_lossy(&payload.text))))
+                            payload.text_as_string())))
                 }
             }, 
         None => Err(ParseError::eof()),
@@ -231,6 +232,6 @@ fn unwrap_token(token: Option<&Token>) -> ParseResult<&Token> {
     }
 }
 
-fn strip_quoted(quoted_text: &[u8]) -> &[u8] {
+fn strip_quoted(quoted_text: &[NonZeroU8]) -> &[NonZeroU8] {
     &quoted_text[1 .. quoted_text.len()-1]
 }

@@ -1,5 +1,6 @@
 use std::io;
 use std::iter;
+use std::ffi::CString;
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
@@ -43,9 +44,9 @@ impl<'a> Validate<'a> for QuakeMap {
         let validate_worldspawn_edict =
             |edict: &Edict| {
                 if let Some(classname) = edict.get(
-                    &b"classname"[..]
+                    &CString::new(&b"classname"[..]).unwrap()
                 ) {
-                    if &**classname == b"worldspawn" {
+                    if classname.as_bytes() == b"worldspawn" {
                         None.into_iter()
                     } else {
                         Some(worldspawn_classname_msg).into_iter()
@@ -131,15 +132,15 @@ impl<'a> Validate<'a> for Entity {
     }
 }
 
-pub type Edict = HashMap<Box<[u8]>, Box<[u8]>>;
+pub type Edict = HashMap<CString, CString>;
 
 impl<W: io::Write> Writes<W> for Edict {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for (key, value) in self {
             writer.write_all(b"\"")?;
-            writer.write_all(key)?;
+            writer.write_all(key.as_bytes())?;
             writer.write_all(b"\" \"")?;
-            writer.write_all(value)?;
+            writer.write_all(value.as_bytes())?;
             writer.write_all(b"\"\r\n")?;
         }
         Ok(())
@@ -149,38 +150,37 @@ impl<W: io::Write> Writes<W> for Edict {
 impl<'a> Validate<'a> for Edict {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         let validate_classname
-            = match self.get(&b"classname"[..]) {
+            = match self.get(&CString::new(&b"classname"[..]).unwrap()) {
                 None => Some(String::from(
                         "Missing classname")).into_iter(),
-                Some(v) if &**v == b"" => Some(String::from(
+                Some(v) if v.as_bytes() == b"" => Some(String::from(
                         "Empty classname")).into_iter(),
                 _ => None.into_iter()
             };
 
         let validate_keyvalues = self.iter().map(
             |(k, v)| {
-                let check_char = |&ch| ch == b'\0' || ch == b'"';
-                let k_string = String::from_utf8_lossy(k);
+                let k_bytes = k.as_bytes();
+                let k_string = String::from_utf8_lossy(k_bytes);
+                let v_bytes = v.as_bytes();
+                let v_string = String::from_utf8_lossy(v_bytes);
 
-                let validate_k
-                    = if k.iter().any(check_char) {
-                        Some(format!(
-                                "Key `{}` contains illegal characters",
-                                k_string)).into_iter()
-                    } else {
-                        None.into_iter()
-                    };
+                let validate_k = if k_bytes.contains(&b'"') {
+                    Some(format!(
+                            "Key `{}` contains illegal characters",
+                            k_string)).into_iter()
+                } else {
+                    None.into_iter()
+                };
 
-                let validate_v
-                    = if v.iter().any(check_char) {
-                        let v_string = String::from_utf8_lossy(v);
-                        Some(format!(
-                                "Key `{}` has value `{}` \
-                                with illegal characters",
-                                k_string, v_string)).into_iter()
-                    } else {
-                        None.into_iter()
-                    };
+                let validate_v = if v_bytes.contains(&b'"') {
+                    Some(format!(
+                            "Key `{}` has value `{}` \
+                            with illegal characters",
+                            k_string, v_string)).into_iter()
+                } else {
+                    None.into_iter()
+                };
 
                 validate_k.chain(validate_v)
             }).flatten();
@@ -229,7 +229,7 @@ impl<'a> Validate<'a> for Brush {
 
 pub struct Surface {
     pub half_space: HalfSpace,
-    pub texture: Box<[u8]>,
+    pub texture: CString,
     pub alignment: Alignment
 }
 
@@ -237,7 +237,7 @@ impl<W: io::Write> Writes<W> for Surface {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         self.half_space.write_to(writer)?;
         writer.write_all(b" ")?;
-        writer.write_all(&self.texture)?;
+        writer.write_all(self.texture.as_bytes())?;
         writer.write_all(b" ")?;
         self.alignment.write_to(writer)?;
         Ok(())
@@ -247,12 +247,16 @@ impl<W: io::Write> Writes<W> for Surface {
 impl<'a> Validate<'a> for Surface {
 
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let check_char = |&ch: &u8| ch == b'\0' || ch.is_ascii_whitespace();
+        //let check_char = |&ch: &u8| ch.is_ascii_whitespace();
 
-        let validate_texture = if self.texture.iter().any(check_char) {
+        let validate_texture = if self.texture.as_bytes()
+            .iter()
+            .any(u8::is_ascii_whitespace)
+        {
             Some(format!(
                     "Texture `{}` has illegal characters",
-                    String::from_utf8_lossy(&self.texture))).into_iter()
+                    String::from_utf8_lossy(
+                        self.texture.as_bytes()))).into_iter()
         } else {
             None.into_iter()
         };

@@ -1,32 +1,39 @@
 use std::cell::RefCell;
 use std::fmt;
+use std::num::NonZeroU8;
 use std::io::Read;
 use std::collections::VecDeque;
+use std::convert::TryInto;
 
 const TEXT_CAPACITY: usize = 32;
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    pub text: Vec<u8>,
+    pub text: Vec<NonZeroU8>,
     pub line_number: usize
 }
 
 impl Token {
     pub fn match_byte(&self, byte: u8) -> bool {
-        self.text.len() == 1 && self.text[0] == byte
+        self.text.len() == 1 && self.text[0].get() == byte
     }
 
     pub fn match_quoted(&self) -> bool {
         self.text.len() >= 2 &&
-            self.text[0] == b'"' &&
-            self.text.last() == Some(&b'"')
+            self.text[0] == b'"'.try_into().unwrap() &&
+            self.text.last() == Some(&b'"'.try_into().unwrap())
+    }
+
+    pub fn text_as_string(&self) -> String {
+        self.text.iter()
+            .map::<char, _>(|ch| ch.get().into())
+            .collect()
     }
 }
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let text = String::from_utf8_lossy(&self.text);
-        write!(f, "{}: line {}", text, self.line_number)
+        write!(f, "{}: line {}", self.text_as_string(), self.line_number)
     }
 }
 
@@ -59,10 +66,10 @@ pub type Result = std::result::Result<VecDeque<Token>, LexerError>;
 
 struct LexerContext {
     token_q: VecDeque<Token>,
-    text: RefCell<Option<Vec<u8>>>,
+    text: RefCell<Option<Vec<NonZeroU8>>>,
     state: fn(ctx: &mut LexerContext),
-    byte: u8,
-    last_byte: Option<u8>,
+    byte: Option<NonZeroU8>,
+    last_byte: Option<NonZeroU8>,
     line_number: usize,
 }
 
@@ -72,7 +79,7 @@ impl LexerContext {
             token_q: VecDeque::new(),
             text: RefCell::new(None),
             state: lex_default,
-            byte: 0,
+            byte: None,
             last_byte: None,
             line_number: 1,
         }
@@ -83,18 +90,27 @@ pub fn lex<R: Read>(reader: R) -> Result {
     let mut ctx = LexerContext::new();
 
     for b in reader.bytes() {
-        ctx.byte = b.map_err(LexerError::Io)?;
+        let byte = b.map_err(LexerError::Io)?;
+        ctx.byte = Some(byte.try_into().map_err(
+                |_| LexerError::Token(TokenError{
+                    message: String::from("Null byte"),
+                    line_number: ctx.line_number
+                }))?);
         (ctx.state)(&mut ctx);
 
-        if ctx.byte == b'\n' || ctx.last_byte == Some(b'\r') {
+        if ctx.byte == NonZeroU8::new(b'\n')
+            || ctx.last_byte == NonZeroU8::new(b'\r')
+        {
             ctx.line_number+= 1;
         }
 
-        ctx.last_byte = Some(ctx.byte);
+        ctx.last_byte = ctx.byte;
     }
 
     if let Some(last_text) = ctx.text.replace(None) {
-        if last_text[0] == b'"' && last_text.last() != Some(&b'"') {
+        if last_text[0] == NonZeroU8::new(b'"').unwrap()
+            && last_text.last() != NonZeroU8::new(b'"').as_ref()
+        {
             return Err(LexerError::Token(TokenError {
                 message: String::from("Missing closing quote"),
                 line_number: ctx.line_number
@@ -111,44 +127,44 @@ pub fn lex<R: Read>(reader: R) -> Result {
 }
 
 fn lex_default(ctx: &mut LexerContext) {
-    if !ctx.byte.is_ascii_whitespace() {
-        if ctx.byte == b'"' {
+    if !ctx.byte.unwrap().get().is_ascii_whitespace() {
+        if ctx.byte == NonZeroU8::new(b'"') {
             ctx.state = lex_quoted;
             let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-            text_bytes.push(ctx.byte);
+            text_bytes.push(ctx.byte.unwrap());
             *ctx.text.borrow_mut() = Some(text_bytes);
-        } else if ctx.byte == b'/' {
+        } else if ctx.byte == NonZeroU8::new(b'/') {
             ctx.state = lex_maybe_comment;
         } else {
             ctx.state = lex_unquoted;
             let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-            text_bytes.push(ctx.byte);
+            text_bytes.push(ctx.byte.unwrap());
             *ctx.text.borrow_mut() = Some(text_bytes);
         }
     }
 }
 
 fn lex_comment(ctx: &mut LexerContext) {
-    if ctx.byte == b'\r' || ctx.byte == b'\n' {
+    if ctx.byte == NonZeroU8::new(b'\r') || ctx.byte == NonZeroU8::new(b'\n') {
         ctx.state = lex_default;
     }
 }
 
 fn lex_maybe_comment(ctx: &mut LexerContext) {
-    if ctx.byte == b'/' {
+    if ctx.byte == NonZeroU8::new(b'/') {
         ctx.state = lex_comment;
     } else {
-        let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-        text_bytes.push(b'/');
-        text_bytes.push(ctx.byte);
+        let mut text_bytes: Vec<NonZeroU8> = Vec::with_capacity(TEXT_CAPACITY);
+        text_bytes.push(NonZeroU8::new(b'/').unwrap());
+        text_bytes.push(ctx.byte.unwrap());
         *ctx.text.borrow_mut() = Some(text_bytes);
         ctx.state = lex_unquoted;
     }
 }
 
 fn lex_quoted(ctx: &mut LexerContext) {
-    ctx.text.borrow_mut().as_mut().unwrap().push(ctx.byte);
-    if ctx.byte == b'"' {
+    ctx.text.borrow_mut().as_mut().unwrap().push(ctx.byte.unwrap());
+    if ctx.byte == NonZeroU8::new(b'"') {
         let local_text = ctx.text.replace(None).unwrap();
         ctx.token_q.push_back(Token {
             text: local_text,
@@ -159,7 +175,7 @@ fn lex_quoted(ctx: &mut LexerContext) {
 }
 
 fn lex_unquoted(ctx: &mut LexerContext) {
-    if ctx.byte.is_ascii_whitespace() {
+    if ctx.byte.unwrap().get().is_ascii_whitespace() {
         let local_text = ctx.text.replace(None).unwrap();
         ctx.token_q.push_back(Token {
             text: local_text,
@@ -167,6 +183,6 @@ fn lex_unquoted(ctx: &mut LexerContext) {
         });
         ctx.state = lex_default;
     } else {
-        ctx.text.borrow_mut().as_mut().unwrap().push(ctx.byte);
+        ctx.text.borrow_mut().as_mut().unwrap().push(ctx.byte.unwrap());
     }
 }
