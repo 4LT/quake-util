@@ -3,4 +3,5 @@ name = "quake-util"
 version = "0.1.0"
 authors = ["Seth <rader.seth@gmail.com>"]
 edition = "2018"
+license = "Unlicense"
 
