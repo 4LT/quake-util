@@ -76,10 +76,11 @@ fn parse_edict(tokens: &mut VecDeque<Token>) -> ParseResult<Edict> {
     let mut edict = Edict::new();
 
     while tokens.front().map_or(false, |tok| tok.match_quoted()) {
-        let key = strip_quoted(&tokens.pop_front().as_ref().unwrap().text);
+        let key = strip_quoted(&tokens.pop_front().as_ref().unwrap().text)
+            .into();
         let maybe_value = tokens.pop_front();
         expect_quoted(maybe_value.as_ref())?;
-        let value = strip_quoted(&maybe_value.unwrap().text);
+        let value = strip_quoted(&maybe_value.unwrap().text).into();
         edict.insert(key, value);
     }
 
@@ -115,7 +116,8 @@ fn parse_surface(tokens: &mut VecDeque<Token>) -> ParseResult<Surface> {
 
     let half_space = HalfSpace(pt1, pt2, pt3);
 
-    let texture = unwrap_token(tokens.pop_front().as_ref())?.text.clone();
+    let texture = Box::from(
+        &unwrap_token(tokens.pop_front().as_ref())?.text[..]);
 
     let alignment = if tokens.front().map_or(false, |tok| tok.match_byte(b'[')) {
         parse_valve_alignment(tokens)?
@@ -229,6 +231,6 @@ fn unwrap_token(token: Option<&Token>) -> ParseResult<&Token> {
     }
 }
 
-fn strip_quoted(quoted_text: &[u8]) -> Vec<u8> {
-    quoted_text[1 .. quoted_text.len()-1].to_vec()
+fn strip_quoted(quoted_text: &[u8]) -> &[u8] {
+    &quoted_text[1 .. quoted_text.len()-1]
 }

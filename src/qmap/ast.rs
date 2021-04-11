@@ -45,7 +45,7 @@ impl<'a> Validate<'a> for QuakeMap {
                 if let Some(classname) = edict.get(
                     &b"classname"[..]
                 ) {
-                    if classname == b"worldspawn" {
+                    if &**classname == b"worldspawn" {
                         None.into_iter()
                     } else {
                         Some(worldspawn_classname_msg).into_iter()
@@ -131,7 +131,7 @@ impl<'a> Validate<'a> for Entity {
     }
 }
 
-pub type Edict = HashMap<Vec<u8>, Vec<u8>>;
+pub type Edict = HashMap<Box<[u8]>, Box<[u8]>>;
 
 impl<W: io::Write> Writes<W> for Edict {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
@@ -152,7 +152,7 @@ impl<'a> Validate<'a> for Edict {
             = match self.get(&b"classname"[..]) {
                 None => Some(String::from(
                         "Missing classname")).into_iter(),
-                Some(v) if v == b"" => Some(String::from(
+                Some(v) if &**v == b"" => Some(String::from(
                         "Empty classname")).into_iter(),
                 _ => None.into_iter()
             };
@@ -229,7 +229,7 @@ impl<'a> Validate<'a> for Brush {
 
 pub struct Surface {
     pub half_space: HalfSpace,
-    pub texture: Vec<u8>,
+    pub texture: Box<[u8]>,
     pub alignment: Alignment
 }
 
