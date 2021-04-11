@@ -1,14 +1,14 @@
+use std::collections::HashMap;
+use std::ffi::CString;
 use std::io;
 use std::iter;
-use std::ffi::CString;
-use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
 
-pub type BoxedValidateIterator<'a> = Box<dyn Iterator<Item=String> + 'a>;
+pub type BoxedValidateIterator<'a> = Box<dyn Iterator<Item = String> + 'a>;
 
 pub trait Writes<W: io::Write> {
     fn write_to(&self, writer: &mut W) -> io::Result<()>;
@@ -21,7 +21,7 @@ pub trait Validate<'a> {
 pub trait AstElement<'a, W: io::Write>: Writes<W> + Validate<'a> {}
 
 pub struct QuakeMap {
-    pub entities: Vec<Entity>
+    pub entities: Vec<Entity>,
 }
 
 impl<W: io::Write> Writes<W> for QuakeMap {
@@ -35,56 +35,60 @@ impl<W: io::Write> Writes<W> for QuakeMap {
 
 impl<'a> Validate<'a> for QuakeMap {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let worldspawn_classname_msg = String::from(
-            "Entity 0: Must have classname of `worldspawn`");
+        let worldspawn_classname_msg =
+            String::from("Entity 0: Must have classname of `worldspawn`");
 
-        let worldspawn_brush_msg = String::from(
-            "Entity 0: Must be a brush entity");
+        let worldspawn_brush_msg =
+            String::from("Entity 0: Must be a brush entity");
 
-        let validate_worldspawn_edict =
-            |edict: &Edict| {
-                if let Some(classname) = edict.get(
-                    &CString::new(&b"classname"[..]).unwrap()
-                ) {
-                    if classname.as_bytes() == b"worldspawn" {
-                        None.into_iter()
-                    } else {
-                        Some(worldspawn_classname_msg).into_iter()
-                    }
+        let validate_worldspawn_edict = |edict: &Edict| {
+            if let Some(classname) =
+                edict.get(&CString::new(&b"classname"[..]).unwrap())
+            {
+                if classname.as_bytes() == b"worldspawn" {
+                    None.into_iter()
                 } else {
                     Some(worldspawn_classname_msg).into_iter()
                 }
-            };
+            } else {
+                Some(worldspawn_classname_msg).into_iter()
+            }
+        };
 
         if self.entities.is_empty() {
-            return Box::new(iter::once(String::from("Zero entities in map")))
-        } 
+            return Box::new(iter::once(String::from("Zero entities in map")));
+        }
 
-        let validate_worldspawn: BoxedValidateIterator<'a>
-            = match &self.entities[0] {
-                Entity::Point(edict) => 
-                    Box::new(validate_worldspawn_edict(&edict).chain(
-                        iter::once(worldspawn_brush_msg))),
-                Entity::Brush(edict, _) => 
-                    Box::new(validate_worldspawn_edict(&edict)),
+        let validate_worldspawn: BoxedValidateIterator<'a> =
+            match &self.entities[0] {
+                Entity::Point(edict) => Box::new(
+                    validate_worldspawn_edict(&edict)
+                        .chain(iter::once(worldspawn_brush_msg)),
+                ),
+                Entity::Brush(edict, _) => {
+                    Box::new(validate_worldspawn_edict(&edict))
+                }
             };
 
-        Box::new(validate_worldspawn.chain(self.entities
-            .iter()
-            .enumerate()
-            .map(|(idx, ent)| {
-                let prepend_index = move |msg| format!(
-                    "Entity {}: {}",
-                    idx, msg);
-                ent.validate().map(prepend_index)
-            })
-            .flatten()))
+        Box::new(
+            validate_worldspawn.chain(
+                self.entities
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, ent)| {
+                        let prepend_index =
+                            move |msg| format!("Entity {}: {}", idx, msg);
+                        ent.validate().map(prepend_index)
+                    })
+                    .flatten(),
+            ),
+        )
     }
 }
 
 pub enum Entity {
     Brush(Edict, Vec<Brush>),
-    Point(Edict)
+    Point(Edict),
 }
 
 impl<W: io::Write> Writes<W> for Entity {
@@ -96,7 +100,7 @@ impl<W: io::Write> Writes<W> for Entity {
                 for brush in brushes {
                     brush.write_to(writer)?;
                 }
-            },
+            }
             Entity::Point(edict) => {
                 edict.write_to(writer)?;
             }
@@ -111,19 +115,20 @@ impl<'a> Validate<'a> for Entity {
         match self {
             Entity::Point(edict) => edict.validate(),
             Entity::Brush(edict, brushes) => {
-                let validate_brushes = brushes.iter()
+                let validate_brushes = brushes
+                    .iter()
                     .enumerate()
                     .map(|(idx, brush)| {
-                        let prepend_brush = move |msg| format!(
-                            "Brush {}: {}",
-                            idx, msg);
+                        let prepend_brush =
+                            move |msg| format!("Brush {}: {}", idx, msg);
                         brush.validate().map(prepend_brush)
-                    }).flatten();
+                    })
+                    .flatten();
 
                 if brushes.is_empty() {
-                    Box::new(edict.validate().chain(
-                        iter::once(
-                            String::from("Brush entity with 0 brushes"))))
+                    Box::new(edict.validate().chain(iter::once(String::from(
+                        "Brush entity with 0 brushes",
+                    ))))
                 } else {
                     Box::new(edict.validate().chain(validate_brushes))
                 }
@@ -149,17 +154,18 @@ impl<W: io::Write> Writes<W> for Edict {
 
 impl<'a> Validate<'a> for Edict {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let validate_classname
-            = match self.get(&CString::new(&b"classname"[..]).unwrap()) {
-                None => Some(String::from(
-                        "Missing classname")).into_iter(),
-                Some(v) if v.as_bytes() == b"" => Some(String::from(
-                        "Empty classname")).into_iter(),
-                _ => None.into_iter()
+        let validate_classname =
+            match self.get(&CString::new(&b"classname"[..]).unwrap()) {
+                None => Some(String::from("Missing classname")).into_iter(),
+                Some(v) if v.as_bytes() == b"" => {
+                    Some(String::from("Empty classname")).into_iter()
+                }
+                _ => None.into_iter(),
             };
 
-        let validate_keyvalues = self.iter().map(
-            |(k, v)| {
+        let validate_keyvalues = self
+            .iter()
+            .map(|(k, v)| {
                 let k_bytes = k.as_bytes();
                 let k_string = String::from_utf8_lossy(k_bytes);
                 let v_bytes = v.as_bytes();
@@ -167,23 +173,28 @@ impl<'a> Validate<'a> for Edict {
 
                 let validate_k = if k_bytes.contains(&b'"') {
                     Some(format!(
-                            "Key `{}` contains illegal characters",
-                            k_string)).into_iter()
+                        "Key `{}` contains illegal characters",
+                        k_string
+                    ))
+                    .into_iter()
                 } else {
                     None.into_iter()
                 };
 
                 let validate_v = if v_bytes.contains(&b'"') {
                     Some(format!(
-                            "Key `{}` has value `{}` \
+                        "Key `{}` has value `{}` \
                             with illegal characters",
-                            k_string, v_string)).into_iter()
+                        k_string, v_string
+                    ))
+                    .into_iter()
                 } else {
                     None.into_iter()
                 };
 
                 validate_k.chain(validate_v)
-            }).flatten();
+            })
+            .flatten();
 
         Box::new(validate_classname.chain(validate_keyvalues))
     }
@@ -206,7 +217,6 @@ impl<W: io::Write> Writes<W> for Brush {
 }
 
 impl<'a> Validate<'a> for Brush {
-
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         let validate_surface_count = if self.len() < 4 {
             Some(String::from("Surface count < 4")).into_iter()
@@ -214,14 +224,15 @@ impl<'a> Validate<'a> for Brush {
             None.into_iter()
         };
 
-        let validate_surfaces = self.iter()
+        let validate_surfaces = self
+            .iter()
             .enumerate()
             .map(|(idx, surf)| {
-                let prepend_surf = move |msg| format!(
-                    "Surface {}: {}",
-                    idx, msg);
+                let prepend_surf =
+                    move |msg| format!("Surface {}: {}", idx, msg);
                 surf.validate().map(prepend_surf)
-            }).flatten();
+            })
+            .flatten();
 
         Box::new(validate_surface_count.chain(validate_surfaces))
     }
@@ -230,7 +241,7 @@ impl<'a> Validate<'a> for Brush {
 pub struct Surface {
     pub half_space: HalfSpace,
     pub texture: CString,
-    pub alignment: Alignment
+    pub alignment: Alignment,
 }
 
 impl<W: io::Write> Writes<W> for Surface {
@@ -245,33 +256,34 @@ impl<W: io::Write> Writes<W> for Surface {
 }
 
 impl<'a> Validate<'a> for Surface {
-
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         //let check_char = |&ch: &u8| ch.is_ascii_whitespace();
 
-        let validate_texture = if self.texture.as_bytes()
-            .iter()
-            .any(u8::is_ascii_whitespace)
-        {
-            Some(format!(
+        let validate_texture =
+            if self.texture.as_bytes().iter().any(u8::is_ascii_whitespace) {
+                Some(format!(
                     "Texture `{}` has illegal characters",
-                    String::from_utf8_lossy(
-                        self.texture.as_bytes()))).into_iter()
-        } else {
-            None.into_iter()
-        };
+                    String::from_utf8_lossy(self.texture.as_bytes())
+                ))
+                .into_iter()
+            } else {
+                None.into_iter()
+            };
 
-        Box::new(self.half_space.validate()
-                 .chain(validate_texture)
-                 .chain(self.alignment.validate()))
+        Box::new(
+            self.half_space
+                .validate()
+                .chain(validate_texture)
+                .chain(self.alignment.validate()),
+        )
     }
 }
 
 pub struct HalfSpace(pub Point, pub Point, pub Point);
 
 impl HalfSpace {
-    fn iter(&self) -> impl Iterator<Item=&Point> + '_ {
-        (0usize..3usize).map(move | i | &self[i])
+    fn iter(&self) -> impl Iterator<Item = &Point> + '_ {
+        (0usize..3usize).map(move |i| &self[i])
     }
 }
 
@@ -283,7 +295,7 @@ impl Index<usize> for HalfSpace {
             0 => &self.0,
             1 => &self.1,
             2 => &self.2,
-            _ => panic!("Out of bounds")
+            _ => panic!("Out of bounds"),
         }
     }
 }
@@ -294,7 +306,7 @@ impl IndexMut<usize> for HalfSpace {
             0 => &mut self.0,
             1 => &mut self.1,
             2 => &mut self.2,
-            _ => panic!("Out of bounds")
+            _ => panic!("Out of bounds"),
         }
     }
 }
@@ -318,21 +330,18 @@ impl<W: io::Write> Writes<W> for HalfSpace {
     }
 }
 
-
 impl<'a> Validate<'a> for HalfSpace {
     #[allow(clippy::float_cmp)]
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let validate_coords = self.iter()
+        let validate_coords = self
+            .iter()
             .map(|pt| pt.iter())
             .flatten()
             .map(|float| float.validate())
             .flatten();
 
         let validate_triangle =
-            if self.0 == self.1
-                || self.0 == self.2
-                || self.1 == self.2
-            {
+            if self.0 == self.1 || self.0 == self.2 || self.1 == self.2 {
                 Some(String::from("Degenerate triangle")).into_iter()
             } else {
                 None.into_iter()
@@ -347,27 +356,40 @@ pub enum Alignment {
     Valve220 {
         base: BaseAlignment,
         u: Vec3,
-        v: Vec3
-    }
+        v: Vec3,
+    },
 }
 
 impl<W: io::Write> Writes<W> for Alignment {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         match self {
             Alignment::Standard(base) => {
-                write!(writer,
-                       "{} {} {} {} {}",
-                       base.offset[0], base.offset[1],
-                       base.rotation,
-                       base.scale[0], base.scale[1])?;
-            },
+                write!(
+                    writer,
+                    "{} {} {} {} {}",
+                    base.offset[0],
+                    base.offset[1],
+                    base.rotation,
+                    base.scale[0],
+                    base.scale[1]
+                )?;
+            }
             Alignment::Valve220 { base, u, v } => {
-                write!(writer,
-                       "[ {} {} {} {} ] [ {} {} {} {} ] {} {} {}",
-                       u[0], u[1], u[2], base.offset[0],
-                       v[0], v[1], v[2], base.offset[1],
-                       base.rotation,
-                       base.scale[0], base.scale[1])?;
+                write!(
+                    writer,
+                    "[ {} {} {} {} ] [ {} {} {} {} ] {} {} {}",
+                    u[0],
+                    u[1],
+                    u[2],
+                    base.offset[0],
+                    v[0],
+                    v[1],
+                    v[2],
+                    base.offset[1],
+                    base.rotation,
+                    base.scale[0],
+                    base.scale[1]
+                )?;
             }
         }
         Ok(())
@@ -376,24 +398,27 @@ impl<W: io::Write> Writes<W> for Alignment {
 
 impl<'a> Validate<'a> for Alignment {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let validate_tex_axis
-            = |vec: &'a Vec3| vec.iter()
-                .map(|float| float.validate())
-                .flatten()
-                .chain(if vec[0] == 0.0 && vec[1] == 0.0 && vec[2] == 0.0 {
+        let validate_tex_axis = |vec: &'a Vec3| {
+            vec.iter().map(|float| float.validate()).flatten().chain(
+                if vec[0] == 0.0 && vec[1] == 0.0 && vec[2] == 0.0 {
                     Some(format!(
                         "Texture axis `{} {} {}` is directionless",
-                        vec[0], vec[1], vec[2])).into_iter()
+                        vec[0], vec[1], vec[2]
+                    ))
+                    .into_iter()
                 } else {
                     None.into_iter()
-                });
+                },
+            )
+        };
 
         match self {
             Alignment::Standard(base) => Box::new(base.validate()),
             Alignment::Valve220 { base, u, v } => Box::new(
                 base.validate()
                     .chain(validate_tex_axis(u))
-                    .chain(validate_tex_axis(v)))
+                    .chain(validate_tex_axis(v)),
+            ),
         }
     }
 }
@@ -401,18 +426,21 @@ impl<'a> Validate<'a> for Alignment {
 pub struct BaseAlignment {
     pub offset: Vec2,
     pub rotation: f64,
-    pub scale: Vec2
+    pub scale: Vec2,
 }
 
 impl<'a> Validate<'a> for BaseAlignment {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        Box::new(self.offset.iter()
-                 .map(|float| float.validate())
-                 .flatten()
-                 .chain(self.rotation.validate())
-                 .chain(self.scale.iter()
-                        .map(|float| float.validate())
-                        .flatten()))
+        Box::new(
+            self.offset
+                .iter()
+                .map(|float| float.validate())
+                .flatten()
+                .chain(self.rotation.validate())
+                .chain(
+                    self.scale.iter().map(|float| float.validate()).flatten(),
+                ),
+        )
     }
 }
 

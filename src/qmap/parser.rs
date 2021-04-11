@@ -1,47 +1,40 @@
 use std::collections::VecDeque;
-use std::str::FromStr;
 use std::num::NonZeroU8;
+use std::str::FromStr;
 
-use crate::qmap::lexer::Token;
 use crate::qmap::ast::{
-    QuakeMap,
-    Entity,
-    Edict,
-    Brush,
+    Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
     Surface,
-    HalfSpace,
-    Alignment,
-    BaseAlignment,
-    Point,
 };
+use crate::qmap::lexer::Token;
 
 const MIN_BRUSH_SURFACES: usize = 4;
 
 pub struct ParseError {
     pub token: Option<Token>,
-    message: String
+    message: String,
 }
 
 impl ParseError {
     pub fn new(token: Option<Token>, message: String) -> ParseError {
-        ParseError{ token, message }
+        ParseError { token, message }
     }
 
     pub fn eof() -> ParseError {
-        ParseError{ token: None, message: String::from("Unexpected EOF") }
+        ParseError {
+            token: None,
+            message: String::from("Unexpected EOF"),
+        }
     }
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.token.as_ref() {
-            Some(tok) => write!(
-                f,
-                "Line {}: {}",
-                tok.line_number,
-                self.message
-            ),
-            None => write!(f, "{}", self.message)
+            Some(tok) => {
+                write!(f, "Line {}: {}", tok.line_number, self.message)
+            }
+            None => write!(f, "{}", self.message),
         }
     }
 }
@@ -56,14 +49,14 @@ pub fn parse(mut tokens: VecDeque<Token>) -> ParseResult<QuakeMap> {
         entities.push(entity);
     }
 
-    Ok(QuakeMap{entities})
+    Ok(QuakeMap { entities })
 }
 
 fn parse_entity(tokens: &mut VecDeque<Token>) -> ParseResult<Entity> {
     expect_byte(tokens.pop_front().as_ref(), b'{')?;
 
     let edict = parse_edict(tokens)?;
-    let brushes = parse_brushes(tokens)?; 
+    let brushes = parse_brushes(tokens)?;
 
     expect_byte(tokens.pop_front().as_ref(), b'}')?;
 
@@ -78,7 +71,8 @@ fn parse_edict(tokens: &mut VecDeque<Token>) -> ParseResult<Edict> {
 
     while tokens.front().map_or(false, |tok| tok.match_quoted()) {
         let key = strip_quoted(&tokens.pop_front().as_ref().unwrap().text)
-            .to_vec().into();
+            .to_vec()
+            .into();
         let maybe_value = tokens.pop_front();
         expect_quoted(maybe_value.as_ref())?;
         let value = strip_quoted(&maybe_value.unwrap().text).to_vec().into();
@@ -117,16 +111,23 @@ fn parse_surface(tokens: &mut VecDeque<Token>) -> ParseResult<Surface> {
 
     let half_space = HalfSpace(pt1, pt2, pt3);
 
-    let texture = unwrap_token(tokens.pop_front().as_ref())?.text.clone()
+    let texture = unwrap_token(tokens.pop_front().as_ref())?
+        .text
+        .clone()
         .into();
 
-    let alignment = if tokens.front().map_or(false, |tok| tok.match_byte(b'[')) {
+    let alignment = if tokens.front().map_or(false, |tok| tok.match_byte(b'['))
+    {
         parse_valve_alignment(tokens)?
     } else {
         parse_standard_alignment(tokens)?
     };
 
-    Ok(Surface{ half_space, texture, alignment })
+    Ok(Surface {
+        half_space,
+        texture,
+        alignment,
+    })
 }
 
 fn parse_point(tokens: &mut VecDeque<Token>) -> ParseResult<Point> {
@@ -139,21 +140,25 @@ fn parse_point(tokens: &mut VecDeque<Token>) -> ParseResult<Point> {
     Ok([x, y, z])
 }
 
-fn parse_standard_alignment(tokens: &mut VecDeque<Token>) -> ParseResult<Alignment> {
+fn parse_standard_alignment(
+    tokens: &mut VecDeque<Token>,
+) -> ParseResult<Alignment> {
     let offset_x = expect_float(tokens.pop_front().as_ref())?;
     let offset_y = expect_float(tokens.pop_front().as_ref())?;
     let rotation = expect_float(tokens.pop_front().as_ref())?;
     let scale_x = expect_float(tokens.pop_front().as_ref())?;
     let scale_y = expect_float(tokens.pop_front().as_ref())?;
 
-    Ok(Alignment::Standard(BaseAlignment{
+    Ok(Alignment::Standard(BaseAlignment {
         offset: [offset_x, offset_y],
         rotation,
         scale: [scale_x, scale_y],
     }))
 }
 
-fn parse_valve_alignment(tokens: &mut VecDeque<Token>) -> ParseResult<Alignment> {
+fn parse_valve_alignment(
+    tokens: &mut VecDeque<Token>,
+) -> ParseResult<Alignment> {
     expect_byte(tokens.pop_front().as_ref(), b'[')?;
     let u_x = expect_float(tokens.pop_front().as_ref())?;
     let u_y = expect_float(tokens.pop_front().as_ref())?;
@@ -172,8 +177,8 @@ fn parse_valve_alignment(tokens: &mut VecDeque<Token>) -> ParseResult<Alignment>
     let scale_x = expect_float(tokens.pop_front().as_ref())?;
     let scale_y = expect_float(tokens.pop_front().as_ref())?;
 
-    Ok(Alignment::Valve220{
-        base: BaseAlignment{
+    Ok(Alignment::Valve220 {
+        base: BaseAlignment {
             offset: [offset_x, offset_y],
             rotation,
             scale: [scale_x, scale_y],
@@ -187,11 +192,13 @@ fn expect_byte(token: Option<&Token>, byte: u8) -> ParseResult<()> {
     match token {
         Some(payload) if payload.match_byte(byte) => Ok(()),
         Some(payload) => Err(ParseError::new(
-                Some(payload.clone()),
-                format!(
-                    "Expected `{}`, got `{}`",
-                    char::from(byte),
-                    payload.text_as_string()))),
+            Some(payload.clone()),
+            format!(
+                "Expected `{}`, got `{}`",
+                char::from(byte),
+                payload.text_as_string()
+            ),
+        )),
         _ => Err(ParseError::eof()),
     }
 }
@@ -200,27 +207,22 @@ fn expect_quoted(token: Option<&Token>) -> ParseResult<()> {
     match token {
         Some(payload) if payload.match_quoted() => Ok(()),
         Some(payload) => Err(ParseError::new(
-                Some(payload.clone()),
-                format!(
-                    "Expected quoted, got `{}`",
-                    payload.text_as_string()))),
+            Some(payload.clone()),
+            format!("Expected quoted, got `{}`", payload.text_as_string()),
+        )),
         _ => Err(ParseError::eof()),
     }
 }
 
 fn expect_float(token: Option<&Token>) -> ParseResult<f64> {
     match token {
-        Some(payload) =>
-            match f64::from_str(&payload.text_as_string()) {
-                Ok(num) => Ok(num),
-                Err(_) => {
-                    Err(ParseError::new(
-                        Some(payload.clone()),
-                        format!(
-                            "Expected number, got `{}`",
-                            payload.text_as_string())))
-                }
-            }, 
+        Some(payload) => match f64::from_str(&payload.text_as_string()) {
+            Ok(num) => Ok(num),
+            Err(_) => Err(ParseError::new(
+                Some(payload.clone()),
+                format!("Expected number, got `{}`", payload.text_as_string()),
+            )),
+        },
         None => Err(ParseError::eof()),
     }
 }
@@ -228,10 +230,10 @@ fn expect_float(token: Option<&Token>) -> ParseResult<f64> {
 fn unwrap_token(token: Option<&Token>) -> ParseResult<&Token> {
     match token {
         Some(payload) => Ok(payload),
-        None => Err(ParseError::eof())
+        None => Err(ParseError::eof()),
     }
 }
 
 fn strip_quoted(quoted_text: &[NonZeroU8]) -> &[NonZeroU8] {
-    &quoted_text[1 .. quoted_text.len()-1]
+    &quoted_text[1..quoted_text.len() - 1]
 }

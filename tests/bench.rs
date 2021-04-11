@@ -1,7 +1,7 @@
-use std::io::{BufReader, sink};
 use std::fs::File;
+use std::io::{sink, BufReader};
 
-use quake_util::qmap::{ lex, parse, Writes };
+use quake_util::qmap::{lex, parse, Writes};
 
 #[test]
 fn bench_parse() -> std::io::Result<()> {
@@ -10,12 +10,12 @@ fn bench_parse() -> std::io::Result<()> {
 
     let tokens = match lex(reader) {
         Ok(tokens) => tokens,
-        Err(err) => panic!("{}", err)
+        Err(err) => panic!("{}", err),
     };
-    
+
     let ast = match parse(tokens) {
         Ok(ast) => ast,
-        Err(err) => panic!("{}", err)
+        Err(err) => panic!("{}", err),
     };
 
     ast.write_to(&mut sink())?;

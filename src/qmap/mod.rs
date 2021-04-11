@@ -1,23 +1,11 @@
+pub mod ast;
 pub mod lexer;
 pub mod parser;
-pub mod ast;
 
-pub use lexer::{Token, lex};
-pub use parser::{ParseResult, parse};
+pub use lexer::{lex, Token};
+pub use parser::{parse, ParseResult};
 
 pub use ast::{
-    Writes,
-    Validate,
-    AstElement,
-    QuakeMap,
-    Entity,
-    Edict,
-    Brush,
-    Surface,
-    HalfSpace,
-    Alignment,
-    BaseAlignment,
-    Point,
-    Vec2,
-    Vec3
+    Alignment, AstElement, BaseAlignment, Brush, Edict, Entity, HalfSpace,
+    Point, QuakeMap, Surface, Validate, Vec2, Vec3, Writes,
 };
