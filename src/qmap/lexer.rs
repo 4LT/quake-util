@@ -1,16 +1,18 @@
 use std::cell::RefCell;
-use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::fmt;
-use std::io::Read;
-use std::num::NonZeroU8;
+use std::io;
+use std::num::{NonZeroU64, NonZeroU8};
+
+use crate::qmap;
+use crate::qmap::Result;
 
 const TEXT_CAPACITY: usize = 32;
 
 #[derive(Debug, Clone)]
 pub struct Token {
     pub text: Vec<NonZeroU8>,
-    pub line_number: usize,
+    pub line_number: NonZeroU64,
 }
 
 impl Token {
@@ -38,161 +40,170 @@ impl fmt::Display for Token {
     }
 }
 
-pub struct TokenError {
-    pub message: String,
-    pub line_number: usize,
-}
-
-impl fmt::Display for TokenError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Line {}: {}", self.line_number, self.message)
-    }
-}
-
-pub enum LexerError {
-    Token(TokenError),
-    Io(std::io::Error),
-}
-
-impl fmt::Display for LexerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            LexerError::Token(e) => e.fmt(f),
-            LexerError::Io(e) => e.fmt(f),
-        }
-    }
-}
-
-pub type Result = std::result::Result<VecDeque<Token>, LexerError>;
-
-struct LexerContext {
-    token_q: VecDeque<Token>,
+pub struct TokenIterator<R: io::Read> {
     text: RefCell<Option<Vec<NonZeroU8>>>,
-    state: fn(ctx: &mut LexerContext),
+    state: fn(iter: &mut TokenIterator<R>) -> Option<Token>,
     byte: Option<NonZeroU8>,
     last_byte: Option<NonZeroU8>,
-    line_number: usize,
+    line_number: NonZeroU64,
+    input: io::Bytes<R>,
 }
 
-impl LexerContext {
-    fn new() -> LexerContext {
-        LexerContext {
-            token_q: VecDeque::new(),
+impl<R: io::Read> TokenIterator<R> {
+    pub fn new(reader: R) -> TokenIterator<R> {
+        TokenIterator {
             text: RefCell::new(None),
             state: lex_default,
             byte: None,
             last_byte: None,
-            line_number: 1,
+            line_number: NonZeroU64::new(1).unwrap(),
+            input: reader.bytes(),
         }
     }
-}
 
-pub fn lex<R: Read>(reader: R) -> Result {
-    let mut ctx = LexerContext::new();
+    fn byte_read(&mut self, b: io::Result<u8>) -> Result<Option<Token>> {
+        let byte = b.map_err(qmap::Error::from_io)?;
 
-    for b in reader.bytes() {
-        let byte = b.map_err(LexerError::Io)?;
-        ctx.byte = Some(byte.try_into().map_err(|_| {
-            LexerError::Token(TokenError {
-                message: String::from("Null byte"),
-                line_number: ctx.line_number,
-            })
+        self.byte = Some(byte.try_into().map_err(|_| {
+            qmap::Error::from_lexer(String::from("Null byte"), self.line_number)
         })?);
-        (ctx.state)(&mut ctx);
 
-        if ctx.byte == NonZeroU8::new(b'\n')
-            || ctx.last_byte == NonZeroU8::new(b'\r')
+        let maybe_token = (self.state)(self);
+
+        if self.byte == NonZeroU8::new(b'\n')
+            || self.last_byte == NonZeroU8::new(b'\r')
         {
-            ctx.line_number += 1;
+            let next_line = self.line_number.get().saturating_add(1);
+            unsafe {
+                self.line_number = NonZeroU64::new_unchecked(next_line);
+            }
         }
 
-        ctx.last_byte = ctx.byte;
+        self.last_byte = self.byte;
+
+        Ok(maybe_token)
     }
 
-    if let Some(last_text) = ctx.text.replace(None) {
-        if last_text[0] == NonZeroU8::new(b'"').unwrap()
-            && last_text.last() != NonZeroU8::new(b'"').as_ref()
-        {
-            return Err(LexerError::Token(TokenError {
-                message: String::from("Missing closing quote"),
-                line_number: ctx.line_number,
-            }));
-        }
-
-        ctx.token_q.push_back(Token {
-            text: last_text,
-            line_number: ctx.line_number,
-        });
-    }
-
-    Ok(ctx.token_q)
-}
-
-fn lex_default(ctx: &mut LexerContext) {
-    if !ctx.byte.unwrap().get().is_ascii_whitespace() {
-        if ctx.byte == NonZeroU8::new(b'"') {
-            ctx.state = lex_quoted;
-            let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-            text_bytes.push(ctx.byte.unwrap());
-            *ctx.text.borrow_mut() = Some(text_bytes);
-        } else if ctx.byte == NonZeroU8::new(b'/') {
-            ctx.state = lex_maybe_comment;
+    fn eof_read(&mut self) -> Result<Option<Token>> {
+        if let Some(last_text) = self.text.replace(None) {
+            if last_text[0] == NonZeroU8::new(b'"').unwrap()
+                && last_text.last() != NonZeroU8::new(b'"').as_ref()
+            {
+                Err(qmap::Error::from_lexer(
+                    String::from("Missing closing quote"),
+                    self.line_number,
+                ))
+            } else {
+                Ok(Some(Token {
+                    text: last_text,
+                    line_number: self.line_number,
+                }))
+            }
         } else {
-            ctx.state = lex_unquoted;
-            let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
-            text_bytes.push(ctx.byte.unwrap());
-            *ctx.text.borrow_mut() = Some(text_bytes);
+            Ok(None)
         }
     }
 }
 
-fn lex_comment(ctx: &mut LexerContext) {
-    if ctx.byte == NonZeroU8::new(b'\r') || ctx.byte == NonZeroU8::new(b'\n') {
-        ctx.state = lex_default;
+impl<R: io::Read> Iterator for TokenIterator<R> {
+    type Item = Result<Token>;
+
+    fn next(&mut self) -> Option<Result<Token>> {
+        loop {
+            if let Some(b) = self.input.next() {
+                if let token @ Some(_) = self.byte_read(b).transpose() {
+                    break token;
+                }
+            } else {
+                break self.eof_read().transpose();
+            }
+        }
     }
 }
 
-fn lex_maybe_comment(ctx: &mut LexerContext) {
-    if ctx.byte == NonZeroU8::new(b'/') {
-        ctx.state = lex_comment;
+fn lex_default<R: io::Read>(iterator: &mut TokenIterator<R>) -> Option<Token> {
+    if !iterator.byte.unwrap().get().is_ascii_whitespace() {
+        if iterator.byte == NonZeroU8::new(b'"') {
+            iterator.state = lex_quoted;
+            let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
+            text_bytes.push(iterator.byte.unwrap());
+            *iterator.text.borrow_mut() = Some(text_bytes);
+        } else if iterator.byte == NonZeroU8::new(b'/') {
+            iterator.state = lex_maybe_comment;
+        } else {
+            iterator.state = lex_unquoted;
+            let mut text_bytes = Vec::with_capacity(TEXT_CAPACITY);
+            text_bytes.push(iterator.byte.unwrap());
+            *iterator.text.borrow_mut() = Some(text_bytes);
+        }
+    }
+
+    None
+}
+
+fn lex_comment<R: io::Read>(iterator: &mut TokenIterator<R>) -> Option<Token> {
+    if iterator.byte == NonZeroU8::new(b'\r')
+        || iterator.byte == NonZeroU8::new(b'\n')
+    {
+        iterator.state = lex_default;
+    }
+
+    None
+}
+
+fn lex_maybe_comment<R: io::Read>(
+    iterator: &mut TokenIterator<R>,
+) -> Option<Token> {
+    if iterator.byte == NonZeroU8::new(b'/') {
+        iterator.state = lex_comment;
     } else {
         let mut text_bytes: Vec<NonZeroU8> = Vec::with_capacity(TEXT_CAPACITY);
         text_bytes.push(NonZeroU8::new(b'/').unwrap());
-        text_bytes.push(ctx.byte.unwrap());
-        *ctx.text.borrow_mut() = Some(text_bytes);
-        ctx.state = lex_unquoted;
+        text_bytes.push(iterator.byte.unwrap());
+        *iterator.text.borrow_mut() = Some(text_bytes);
+        iterator.state = lex_unquoted;
     }
+
+    None
 }
 
-fn lex_quoted(ctx: &mut LexerContext) {
-    ctx.text
+fn lex_quoted<R: io::Read>(iterator: &mut TokenIterator<R>) -> Option<Token> {
+    iterator
+        .text
         .borrow_mut()
         .as_mut()
         .unwrap()
-        .push(ctx.byte.unwrap());
-    if ctx.byte == NonZeroU8::new(b'"') {
-        let local_text = ctx.text.replace(None).unwrap();
-        ctx.token_q.push_back(Token {
+        .push(iterator.byte.unwrap());
+    if iterator.byte == NonZeroU8::new(b'"') {
+        let local_text = iterator.text.replace(None).unwrap();
+        iterator.state = lex_default;
+
+        Some(Token {
             text: local_text,
-            line_number: ctx.line_number,
-        });
-        ctx.state = lex_default;
+            line_number: iterator.line_number,
+        })
+    } else {
+        None
     }
 }
 
-fn lex_unquoted(ctx: &mut LexerContext) {
-    if ctx.byte.unwrap().get().is_ascii_whitespace() {
-        let local_text = ctx.text.replace(None).unwrap();
-        ctx.token_q.push_back(Token {
+fn lex_unquoted<R: io::Read>(iterator: &mut TokenIterator<R>) -> Option<Token> {
+    if iterator.byte.unwrap().get().is_ascii_whitespace() {
+        let local_text = iterator.text.replace(None).unwrap();
+        iterator.state = lex_default;
+
+        Some(Token {
             text: local_text,
-            line_number: ctx.line_number,
-        });
-        ctx.state = lex_default;
+            line_number: iterator.line_number,
+        })
     } else {
-        ctx.text
+        iterator
+            .text
             .borrow_mut()
             .as_mut()
             .unwrap()
-            .push(ctx.byte.unwrap());
+            .push(iterator.byte.unwrap());
+
+        None
     }
 }

@@ -1,64 +1,39 @@
-use std::collections::VecDeque;
+use std::io::Read;
+use std::iter::Peekable;
 use std::num::NonZeroU8;
 use std::str::FromStr;
 
-use crate::qmap::ast::{
+use crate::qmap;
+use qmap::ast::{
     Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
     Surface,
 };
-use crate::qmap::lexer::Token;
+use qmap::lexer::{Token, TokenIterator};
 
+type TokenPeekable<R> = Peekable<TokenIterator<R>>;
 const MIN_BRUSH_SURFACES: usize = 4;
 
-pub struct ParseError {
-    pub token: Option<Token>,
-    message: String,
-}
-
-impl ParseError {
-    pub fn new(token: Option<Token>, message: String) -> ParseError {
-        ParseError { token, message }
-    }
-
-    pub fn eof() -> ParseError {
-        ParseError {
-            token: None,
-            message: String::from("Unexpected EOF"),
-        }
-    }
-}
-
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.token.as_ref() {
-            Some(tok) => {
-                write!(f, "Line {}: {}", tok.line_number, self.message)
-            }
-            None => write!(f, "{}", self.message),
-        }
-    }
-}
-
-pub type ParseResult<T> = std::result::Result<T, ParseError>;
-
-pub fn parse(mut tokens: VecDeque<Token>) -> ParseResult<QuakeMap> {
+pub fn parse<R: Read>(reader: R) -> qmap::Result<QuakeMap> {
     let mut entities: Vec<Entity> = Vec::new();
+    let mut peekable_tokens = TokenIterator::new(reader).peekable();
 
-    while !tokens.is_empty() {
-        let entity = parse_entity(&mut tokens)?;
+    while peekable_tokens.peek().is_some() {
+        let entity = parse_entity(&mut peekable_tokens)?;
         entities.push(entity);
     }
 
     Ok(QuakeMap { entities })
 }
 
-fn parse_entity(tokens: &mut VecDeque<Token>) -> ParseResult<Entity> {
-    expect_byte(tokens.pop_front().as_ref(), b'{')?;
+fn parse_entity<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> qmap::Result<Entity> {
+    expect_byte(&tokens.next().transpose()?, b'{')?;
 
     let edict = parse_edict(tokens)?;
     let brushes = parse_brushes(tokens)?;
 
-    expect_byte(tokens.pop_front().as_ref(), b'}')?;
+    expect_byte(&tokens.next().transpose()?, b'}')?;
 
     match brushes.len() {
         0 => Ok(Entity::Point(edict)),
@@ -66,61 +41,77 @@ fn parse_entity(tokens: &mut VecDeque<Token>) -> ParseResult<Entity> {
     }
 }
 
-fn parse_edict(tokens: &mut VecDeque<Token>) -> ParseResult<Edict> {
+fn parse_edict<R: Read>(tokens: &mut TokenPeekable<R>) -> qmap::Result<Edict> {
     let mut edict = Edict::new();
 
-    while tokens.front().map_or(false, |tok| tok.match_quoted()) {
-        let key = strip_quoted(&tokens.pop_front().as_ref().unwrap().text)
-            .to_vec()
-            .into();
-        let maybe_value = tokens.pop_front();
-        expect_quoted(maybe_value.as_ref())?;
-        let value = strip_quoted(&maybe_value.unwrap().text).to_vec().into();
-        edict.insert(key, value);
+    while let Some(tok_res) = tokens.peek() {
+        if tok_res.as_ref().map_err(|e| e.clone())?.match_quoted() {
+            let key = strip_quoted(&tokens.next().transpose()?.unwrap().text)
+                .to_vec()
+                .into();
+            let maybe_value = tokens.next().transpose()?;
+            expect_quoted(&maybe_value)?;
+            let value =
+                strip_quoted(&maybe_value.unwrap().text).to_vec().into();
+            edict.insert(key, value);
+        }
     }
 
     Ok(edict)
 }
 
-fn parse_brushes(tokens: &mut VecDeque<Token>) -> ParseResult<Vec<Brush>> {
+fn parse_brushes<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> qmap::Result<Vec<Brush>> {
     let mut brushes = Vec::new();
 
-    while tokens.front().map_or(false, |tok| tok.match_byte(b'{')) {
-        brushes.push(parse_brush(tokens)?);
+    while let Some(tok_res) = tokens.peek() {
+        if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'{') {
+            brushes.push(parse_brush(tokens)?);
+        }
     }
 
     Ok(brushes)
 }
 
-fn parse_brush(tokens: &mut VecDeque<Token>) -> ParseResult<Brush> {
+fn parse_brush<R: Read>(tokens: &mut TokenPeekable<R>) -> qmap::Result<Brush> {
     let mut surfaces = Vec::with_capacity(MIN_BRUSH_SURFACES);
-    expect_byte(tokens.pop_front().as_ref(), b'{')?;
+    expect_byte(&tokens.next().transpose()?, b'{')?;
 
-    while tokens.front().map_or(false, |tok| tok.match_byte(b'(')) {
-        surfaces.push(parse_surface(tokens)?);
+    while let Some(tok_res) = tokens.peek() {
+        if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'(') {
+            surfaces.push(parse_surface(tokens)?);
+        }
     }
 
-    expect_byte(tokens.pop_front().as_ref(), b'}')?;
+    expect_byte(&tokens.next().transpose()?, b'}')?;
     Ok(surfaces)
 }
 
-fn parse_surface(tokens: &mut VecDeque<Token>) -> ParseResult<Surface> {
+fn parse_surface<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> qmap::Result<Surface> {
     let pt1 = parse_point(tokens)?;
     let pt2 = parse_point(tokens)?;
     let pt3 = parse_point(tokens)?;
 
     let half_space = HalfSpace(pt1, pt2, pt3);
 
-    let texture = unwrap_token(tokens.pop_front().as_ref())?
+    let texture = tokens
+        .next()
+        .transpose()?
+        .ok_or_else(qmap::Error::eof)?
         .text
-        .clone()
         .into();
 
-    let alignment = if tokens.front().map_or(false, |tok| tok.match_byte(b'['))
-    {
-        parse_valve_alignment(tokens)?
+    let alignment = if let Some(tok_res) = tokens.peek() {
+        if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'[') {
+            parse_valve_alignment(tokens)?
+        } else {
+            parse_standard_alignment(tokens)?
+        }
     } else {
-        parse_standard_alignment(tokens)?
+        return Err(qmap::Error::eof());
     };
 
     Ok(Surface {
@@ -130,24 +121,24 @@ fn parse_surface(tokens: &mut VecDeque<Token>) -> ParseResult<Surface> {
     })
 }
 
-fn parse_point(tokens: &mut VecDeque<Token>) -> ParseResult<Point> {
-    expect_byte(tokens.pop_front().as_ref(), b'(')?;
-    let x = expect_float(tokens.pop_front().as_ref())?;
-    let y = expect_float(tokens.pop_front().as_ref())?;
-    let z = expect_float(tokens.pop_front().as_ref())?;
-    expect_byte(tokens.pop_front().as_ref(), b')')?;
+fn parse_point<R: Read>(tokens: &mut TokenPeekable<R>) -> qmap::Result<Point> {
+    expect_byte(&tokens.next().transpose()?, b'(')?;
+    let x = expect_float(&tokens.next().transpose()?)?;
+    let y = expect_float(&tokens.next().transpose()?)?;
+    let z = expect_float(&tokens.next().transpose()?)?;
+    expect_byte(&tokens.next().transpose()?, b')')?;
 
     Ok([x, y, z])
 }
 
-fn parse_standard_alignment(
-    tokens: &mut VecDeque<Token>,
-) -> ParseResult<Alignment> {
-    let offset_x = expect_float(tokens.pop_front().as_ref())?;
-    let offset_y = expect_float(tokens.pop_front().as_ref())?;
-    let rotation = expect_float(tokens.pop_front().as_ref())?;
-    let scale_x = expect_float(tokens.pop_front().as_ref())?;
-    let scale_y = expect_float(tokens.pop_front().as_ref())?;
+fn parse_standard_alignment<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> qmap::Result<Alignment> {
+    let offset_x = expect_float(&tokens.next().transpose()?)?;
+    let offset_y = expect_float(&tokens.next().transpose()?)?;
+    let rotation = expect_float(&tokens.next().transpose()?)?;
+    let scale_x = expect_float(&tokens.next().transpose()?)?;
+    let scale_y = expect_float(&tokens.next().transpose()?)?;
 
     Ok(Alignment::Standard(BaseAlignment {
         offset: [offset_x, offset_y],
@@ -156,26 +147,26 @@ fn parse_standard_alignment(
     }))
 }
 
-fn parse_valve_alignment(
-    tokens: &mut VecDeque<Token>,
-) -> ParseResult<Alignment> {
-    expect_byte(tokens.pop_front().as_ref(), b'[')?;
-    let u_x = expect_float(tokens.pop_front().as_ref())?;
-    let u_y = expect_float(tokens.pop_front().as_ref())?;
-    let u_z = expect_float(tokens.pop_front().as_ref())?;
-    let offset_x = expect_float(tokens.pop_front().as_ref())?;
-    expect_byte(tokens.pop_front().as_ref(), b']')?;
+fn parse_valve_alignment<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> qmap::Result<Alignment> {
+    expect_byte(&tokens.next().transpose()?, b'[')?;
+    let u_x = expect_float(&tokens.next().transpose()?)?;
+    let u_y = expect_float(&tokens.next().transpose()?)?;
+    let u_z = expect_float(&tokens.next().transpose()?)?;
+    let offset_x = expect_float(&tokens.next().transpose()?)?;
+    expect_byte(&tokens.next().transpose()?, b']')?;
 
-    expect_byte(tokens.pop_front().as_ref(), b'[')?;
-    let v_x = expect_float(tokens.pop_front().as_ref())?;
-    let v_y = expect_float(tokens.pop_front().as_ref())?;
-    let v_z = expect_float(tokens.pop_front().as_ref())?;
-    let offset_y = expect_float(tokens.pop_front().as_ref())?;
-    expect_byte(tokens.pop_front().as_ref(), b']')?;
+    expect_byte(&tokens.next().transpose()?, b'[')?;
+    let v_x = expect_float(&tokens.next().transpose()?)?;
+    let v_y = expect_float(&tokens.next().transpose()?)?;
+    let v_z = expect_float(&tokens.next().transpose()?)?;
+    let offset_y = expect_float(&tokens.next().transpose()?)?;
+    expect_byte(&tokens.next().transpose()?, b']')?;
 
-    let rotation = expect_float(tokens.pop_front().as_ref())?;
-    let scale_x = expect_float(tokens.pop_front().as_ref())?;
-    let scale_y = expect_float(tokens.pop_front().as_ref())?;
+    let rotation = expect_float(&tokens.next().transpose()?)?;
+    let scale_x = expect_float(&tokens.next().transpose()?)?;
+    let scale_y = expect_float(&tokens.next().transpose()?)?;
 
     Ok(Alignment::Valve220 {
         base: BaseAlignment {
@@ -188,49 +179,42 @@ fn parse_valve_alignment(
     })
 }
 
-fn expect_byte(token: Option<&Token>, byte: u8) -> ParseResult<()> {
-    match token {
+fn expect_byte(token: &Option<Token>, byte: u8) -> qmap::Result<()> {
+    match token.as_ref() {
         Some(payload) if payload.match_byte(byte) => Ok(()),
-        Some(payload) => Err(ParseError::new(
-            Some(payload.clone()),
+        Some(payload) => Err(qmap::Error::from_parser(
             format!(
                 "Expected `{}`, got `{}`",
                 char::from(byte),
                 payload.text_as_string()
             ),
+            payload.line_number,
         )),
-        _ => Err(ParseError::eof()),
+        _ => Err(qmap::Error::eof()),
     }
 }
 
-fn expect_quoted(token: Option<&Token>) -> ParseResult<()> {
-    match token {
+fn expect_quoted(token: &Option<Token>) -> qmap::Result<()> {
+    match token.as_ref() {
         Some(payload) if payload.match_quoted() => Ok(()),
-        Some(payload) => Err(ParseError::new(
-            Some(payload.clone()),
+        Some(payload) => Err(qmap::Error::from_parser(
             format!("Expected quoted, got `{}`", payload.text_as_string()),
+            payload.line_number,
         )),
-        _ => Err(ParseError::eof()),
+        _ => Err(qmap::Error::eof()),
     }
 }
 
-fn expect_float(token: Option<&Token>) -> ParseResult<f64> {
-    match token {
+fn expect_float(token: &Option<Token>) -> qmap::Result<f64> {
+    match token.as_ref() {
         Some(payload) => match f64::from_str(&payload.text_as_string()) {
             Ok(num) => Ok(num),
-            Err(_) => Err(ParseError::new(
-                Some(payload.clone()),
+            Err(_) => Err(qmap::Error::from_parser(
                 format!("Expected number, got `{}`", payload.text_as_string()),
+                payload.line_number,
             )),
         },
-        None => Err(ParseError::eof()),
-    }
-}
-
-fn unwrap_token(token: Option<&Token>) -> ParseResult<&Token> {
-    match token {
-        Some(payload) => Ok(payload),
-        None => Err(ParseError::eof()),
+        None => Err(qmap::Error::eof()),
     }
 }
 
