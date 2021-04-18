@@ -54,6 +54,8 @@ fn parse_edict<R: Read>(tokens: &mut TokenPeekable<R>) -> qmap::Result<Edict> {
             let value =
                 strip_quoted(&maybe_value.unwrap().text).to_vec().into();
             edict.insert(key, value);
+        } else {
+            break;
         }
     }
 
@@ -68,6 +70,8 @@ fn parse_brushes<R: Read>(
     while let Some(tok_res) = tokens.peek() {
         if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'{') {
             brushes.push(parse_brush(tokens)?);
+        } else {
+            break;
         }
     }
 
@@ -81,6 +85,8 @@ fn parse_brush<R: Read>(tokens: &mut TokenPeekable<R>) -> qmap::Result<Brush> {
     while let Some(tok_res) = tokens.peek() {
         if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'(') {
             surfaces.push(parse_surface(tokens)?);
+        } else {
+            break;
         }
     }
 
