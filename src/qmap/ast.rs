@@ -62,11 +62,11 @@ impl<'a> Validate<'a> for QuakeMap {
         let validate_worldspawn: BoxedValidateIterator<'a> =
             match &self.entities[0] {
                 Entity::Point(edict) => Box::new(
-                    validate_worldspawn_edict(&edict)
+                    validate_worldspawn_edict(edict)
                         .chain(iter::once(worldspawn_brush_msg)),
                 ),
                 Entity::Brush(edict, _) => {
-                    Box::new(validate_worldspawn_edict(&edict))
+                    Box::new(validate_worldspawn_edict(edict))
                 }
             };
 
@@ -94,8 +94,8 @@ pub enum Entity {
 impl Entity {
     pub fn edict(&self) -> &Edict {
         match self {
-            Self::Point(edict) => &edict,
-            Self::Brush(edict, _) => &edict,
+            Self::Point(edict) => edict,
+            Self::Brush(edict, _) => edict,
         }
     }
 }
