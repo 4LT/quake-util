@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use crate::qmap;
 use qmap::ast::{
-    Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
+    Alignment, BaseAlignment, Brush, Edict, Entity, Point, QuakeMap,
     Surface,
 };
 use qmap::lexer::{Token, TokenIterator};
@@ -101,7 +101,7 @@ fn parse_surface<R: Read>(
     let pt2 = parse_point(tokens)?;
     let pt3 = parse_point(tokens)?;
 
-    let half_space = HalfSpace(pt1, pt2, pt3);
+    let half_space = [pt1, pt2, pt3];
 
     let texture = tokens
         .next()
@@ -180,8 +180,7 @@ fn parse_valve_alignment<R: Read>(
             rotation,
             scale: [scale_x, scale_y],
         },
-        u: [u_x, u_y, u_z],
-        v: [v_x, v_y, v_z],
+        axes: [[u_x, u_y, u_z], [v_x, v_y, v_z]],
     })
 }
 

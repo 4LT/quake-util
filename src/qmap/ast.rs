@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::io;
 use std::iter;
-use std::ops::{Index, IndexMut};
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
@@ -288,41 +287,11 @@ impl<'a> Validate<'a> for Surface {
     }
 }
 
-pub struct HalfSpace(pub Point, pub Point, pub Point);
-
-impl HalfSpace {
-    fn iter(&self) -> impl Iterator<Item = &Point> + '_ {
-        (0usize..3usize).map(move |i| &self[i])
-    }
-}
-
-impl Index<usize> for HalfSpace {
-    type Output = Point;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        match index {
-            0 => &self.0,
-            1 => &self.1,
-            2 => &self.2,
-            _ => panic!("Out of bounds"),
-        }
-    }
-}
-
-impl IndexMut<usize> for HalfSpace {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        match index {
-            0 => &mut self.0,
-            1 => &mut self.1,
-            2 => &mut self.2,
-            _ => panic!("Out of bounds"),
-        }
-    }
-}
+pub type HalfSpace = [Point; 3];
 
 impl<W: io::Write> Writes<W> for HalfSpace {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
-        for (index, pt) in self.iter().enumerate() {
+        for (index, pt) in self.into_iter().enumerate() {
             writer.write_all(b"( ")?;
 
             for element in pt.iter() {
@@ -350,7 +319,7 @@ impl<'a> Validate<'a> for HalfSpace {
             .flatten();
 
         let validate_triangle =
-            if self.0 == self.1 || self.0 == self.2 || self.1 == self.2 {
+            if self[0] == self[1] || self[0] == self[2] || self[1] == self[2] {
                 Some(String::from("Degenerate triangle")).into_iter()
             } else {
                 None.into_iter()
@@ -364,8 +333,7 @@ pub enum Alignment {
     Standard(BaseAlignment),
     Valve220 {
         base: BaseAlignment,
-        u: Vec3,
-        v: Vec3,
+        axes: [Vec3; 2]
     },
 }
 
@@ -383,7 +351,7 @@ impl<W: io::Write> Writes<W> for Alignment {
                     base.scale[1]
                 )?;
             }
-            Alignment::Valve220 { base, u, v } => {
+            Alignment::Valve220 { base, axes: [u, v] } => {
                 write!(
                     writer,
                     "[ {} {} {} {} ] [ {} {} {} {} ] {} {} {}",
@@ -423,7 +391,7 @@ impl<'a> Validate<'a> for Alignment {
 
         match self {
             Alignment::Standard(base) => Box::new(base.validate()),
-            Alignment::Valve220 { base, u, v } => Box::new(
+            Alignment::Valve220 { base, axes: [u, v] } => Box::new(
                 base.validate()
                     .chain(validate_tex_axis(u))
                     .chain(validate_tex_axis(v)),
