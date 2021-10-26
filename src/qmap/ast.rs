@@ -291,7 +291,7 @@ pub type HalfSpace = [Point; 3];
 
 impl<W: io::Write> Writes<W> for HalfSpace {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
-        for (index, pt) in self.into_iter().enumerate() {
+        for (index, pt) in self.iter().enumerate() {
             writer.write_all(b"( ")?;
 
             for element in pt.iter() {
