@@ -4,7 +4,7 @@ use std::num::NonZeroU8;
 use std::str::FromStr;
 
 use crate::qmap;
-use qmap::ast::{
+use qmap::repr::{
     Alignment, BaseAlignment, Brush, Edict, Entity, Point, QuakeMap,
     Surface,
 };

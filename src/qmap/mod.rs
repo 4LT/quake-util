@@ -1,9 +1,9 @@
-pub mod ast;
+pub mod repr;
 mod lexer;
 pub mod parser;
 pub mod result;
 
-pub use ast::{
+pub use repr::{
     Alignment, AstElement, BaseAlignment, Brush, Edict, Entity, HalfSpace,
     Point, QuakeMap, Surface, Validate, Vec2, Vec3, Writes,
 };
