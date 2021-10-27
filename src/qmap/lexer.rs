@@ -1,8 +1,15 @@
-use std::cell::RefCell;
-use std::convert::TryInto;
-use std::fmt;
-use std::io;
-use std::num::{NonZeroU64, NonZeroU8};
+#[cfg(feature = "std")]
+extern crate std;
+
+use std::{
+    cell::RefCell,
+    convert::TryInto,
+    fmt,
+    io,
+    num::{NonZeroU64, NonZeroU8},
+    vec::Vec,
+    string::String
+};
 
 use crate::qmap;
 use crate::qmap::Result;

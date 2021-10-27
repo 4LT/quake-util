@@ -1,5 +1,11 @@
-use std::fmt;
-use std::num::NonZeroU64;
+#[cfg(feature = "std")]
+extern crate std;
+
+use std::{
+    fmt,
+    num::NonZeroU64,
+    string::{ String, ToString }
+};
 
 #[derive(Debug, Clone)]
 pub struct LineError {

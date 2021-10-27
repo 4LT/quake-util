@@ -5,3 +5,11 @@ authors = ["Seth <rader.seth@gmail.com>"]
 edition = "2021"
 license = "Unlicense"
 
+[features]
+default = ["std"]
+core_fills = ["hashbrown", "cstr_core"]
+std = []
+
+[dependencies]
+hashbrown = { version = "^0.11", optional = true }
+cstr_core = { version = "^0.2", optional = true, features = ["alloc"] }

@@ -1,7 +1,13 @@
-use std::io::Read;
-use std::iter::Peekable;
-use std::num::NonZeroU8;
-use std::str::FromStr;
+#[cfg(feature = "std")]
+extern crate std;
+
+use std::{
+    io::Read,
+    iter::Peekable,
+    num::NonZeroU8,
+    str::FromStr,
+    vec::Vec
+};
 
 use crate::qmap;
 use qmap::repr::{

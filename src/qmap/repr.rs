@@ -1,7 +1,38 @@
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "hashbrown"))]
 use std::collections::HashMap;
+
+#[cfg(feature = "hashbrown")]
+use hashbrown::HashMap;
+
+#[cfg(not(feature = "cstr_core"))]
 use std::ffi::CString;
-use std::io;
-use std::iter;
+
+#[cfg(feature = "cstr_core")]
+use cstr_core::CString;
+
+#[cfg(feature = "std")]
+use std::{ io, iter };
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    boxed::Box,
+    string::String,
+    vec::Vec
+};
+
+#[cfg(feature = "std")]
+use std::{
+    boxed::Box,
+    string::String,
+    vec::Vec
+};
+
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
@@ -9,20 +40,24 @@ pub type Vec2 = [f64; 2];
 
 pub type BoxedValidateIterator<'a> = Box<dyn Iterator<Item = String> + 'a>;
 
+#[cfg(feature = "std")]
 pub trait Writes<W: io::Write> {
     fn write_to(&self, writer: &mut W) -> io::Result<()>;
 }
 
+#[cfg(feature = "std")]
 pub trait Validate<'a> {
     fn validate(&'a self) -> BoxedValidateIterator<'a>;
 }
 
+#[cfg(feature = "std")]
 pub trait AstElement<'a, W: io::Write>: Writes<W> + Validate<'a> {}
 
 pub struct QuakeMap {
     pub entities: Vec<Entity>,
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for QuakeMap {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for ent in &self.entities {
@@ -32,6 +67,7 @@ impl<W: io::Write> Writes<W> for QuakeMap {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for QuakeMap {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         let worldspawn_classname_msg =
@@ -99,6 +135,7 @@ impl Entity {
     }
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Entity {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         writer.write_all(b"{\r\n")?;
@@ -118,6 +155,7 @@ impl<W: io::Write> Writes<W> for Entity {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for Entity {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         match self {
@@ -147,6 +185,7 @@ impl<'a> Validate<'a> for Entity {
 
 pub type Edict = HashMap<CString, CString>;
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Edict {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for (key, value) in self {
@@ -160,6 +199,7 @@ impl<W: io::Write> Writes<W> for Edict {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for Edict {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         let validate_classname =
@@ -210,6 +250,7 @@ impl<'a> Validate<'a> for Edict {
 
 pub type Brush = Vec<Surface>;
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Brush {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         writer.write_all(b"{\r\n")?;
@@ -224,6 +265,7 @@ impl<W: io::Write> Writes<W> for Brush {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for Brush {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         let validate_surface_count = if self.len() < 4 {
@@ -252,6 +294,7 @@ pub struct Surface {
     pub alignment: Alignment,
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Surface {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         self.half_space.write_to(writer)?;
@@ -263,6 +306,7 @@ impl<W: io::Write> Writes<W> for Surface {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for Surface {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         //let check_char = |&ch: &u8| ch.is_ascii_whitespace();
@@ -289,6 +333,7 @@ impl<'a> Validate<'a> for Surface {
 
 pub type HalfSpace = [Point; 3];
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for HalfSpace {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for (index, pt) in self.iter().enumerate() {
@@ -308,6 +353,7 @@ impl<W: io::Write> Writes<W> for HalfSpace {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for HalfSpace {
     #[allow(clippy::float_cmp)]
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
@@ -337,6 +383,7 @@ pub enum Alignment {
     },
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Alignment {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         match self {
@@ -373,6 +420,7 @@ impl<W: io::Write> Writes<W> for Alignment {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for Alignment {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         let validate_tex_axis = |vec: &'a Vec3| {
@@ -406,6 +454,7 @@ pub struct BaseAlignment {
     pub scale: Vec2,
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for BaseAlignment {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         Box::new(
@@ -421,6 +470,7 @@ impl<'a> Validate<'a> for BaseAlignment {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> Validate<'a> for f64 {
     fn validate(&'a self) -> BoxedValidateIterator<'a> {
         Box::new(if self.is_finite() {
