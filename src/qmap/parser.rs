@@ -1,20 +1,13 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-use std::{
-    io::Read,
-    iter::Peekable,
-    num::NonZeroU8,
-    str::FromStr,
-    vec::Vec
-};
+use std::{io::Read, iter::Peekable, num::NonZeroU8, str::FromStr, vec::Vec};
 
 use crate::qmap;
-use qmap::repr::{
-    Alignment, BaseAlignment, Brush, Edict, Entity, Point, QuakeMap,
-    Surface,
-};
 use qmap::lexer::{Token, TokenIterator};
+use qmap::repr::{
+    Alignment, BaseAlignment, Brush, Edict, Entity, Point, QuakeMap, Surface,
+};
 
 type TokenPeekable<R> = Peekable<TokenIterator<R>>;
 const MIN_BRUSH_SURFACES: usize = 4;

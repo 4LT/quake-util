@@ -4,7 +4,7 @@ extern crate std;
 use std::{
     fmt,
     num::NonZeroU64,
-    string::{ String, ToString }
+    string::{String, ToString},
 };
 
 #[derive(Debug, Clone)]

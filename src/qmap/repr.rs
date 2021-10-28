@@ -17,22 +17,13 @@ use std::ffi::CString;
 use cstr_core::CString;
 
 #[cfg(feature = "std")]
-use std::{ io, iter };
+use std::{io, iter};
 
 #[cfg(not(feature = "std"))]
-use alloc::{
-    boxed::Box,
-    string::String,
-    vec::Vec
-};
+use alloc::{boxed::Box, string::String, vec::Vec};
 
 #[cfg(feature = "std")]
-use std::{
-    boxed::Box,
-    string::String,
-    vec::Vec
-};
-
+use std::{boxed::Box, string::String, vec::Vec};
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
@@ -379,7 +370,7 @@ pub enum Alignment {
     Standard(BaseAlignment),
     Valve220 {
         base: BaseAlignment,
-        axes: [Vec3; 2]
+        axes: [Vec3; 2],
     },
 }
 
