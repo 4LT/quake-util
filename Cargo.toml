@@ -7,7 +7,7 @@ license = "CC0-1.0 OR MIT"
 
 [features]
 default = ["std"]
-core_fills = ["hashbrown", "cstr_core"]
+alloc_fills = ["hashbrown", "cstr_core"]
 std = []
 
 [dependencies]
