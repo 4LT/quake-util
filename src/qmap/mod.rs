@@ -15,7 +15,7 @@ pub use repr::{
 };
 
 #[cfg(feature = "std")]
-pub use repr::{AstElement, Writes};
+pub use repr::Writes;
 
 #[cfg(feature = "std")]
 pub use parser::parse;

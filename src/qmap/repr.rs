@@ -36,9 +36,7 @@ pub trait Validates {
     fn validate(&self) -> Result<(), String>;
 }
 
-#[cfg(feature = "std")]
-pub trait AstElement<W: io::Write>: Writes<W> + Validates {}
-
+#[derive(Clone)]
 pub struct QuakeMap {
     pub entities: Vec<Entity>,
 }
@@ -63,6 +61,7 @@ impl Validates for QuakeMap {
     }
 }
 
+#[derive(Clone)]
 pub enum Entity {
     Brush(Edict, Vec<Brush>),
     Point(Edict),
@@ -165,6 +164,7 @@ impl Validates for Brush {
     }
 }
 
+#[derive(Clone)]
 pub struct Surface {
     pub half_space: HalfSpace,
     pub texture: CString,
@@ -224,6 +224,7 @@ impl Validates for HalfSpace {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum Alignment {
     Standard(BaseAlignment),
     Valve220(BaseAlignment, [Vec3; 2]),
@@ -290,6 +291,7 @@ impl Validates for Alignment {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct BaseAlignment {
     pub offset: Vec2,
     pub rotation: f64,
