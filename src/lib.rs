@@ -7,4 +7,8 @@ compile_error!("Must use feature 'std' or include 'hashbrown'");
 #[macro_use]
 extern crate std;
 
+#[cfg(not(feature = "std"))]
+#[macro_use]
+extern crate alloc;
+
 pub mod qmap;

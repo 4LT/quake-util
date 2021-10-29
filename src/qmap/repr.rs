@@ -4,45 +4,40 @@ extern crate std;
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
-#[cfg(not(feature = "hashbrown"))]
-use std::collections::HashMap;
-
 #[cfg(feature = "hashbrown")]
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 
-#[cfg(not(feature = "cstr_core"))]
-use std::ffi::CString;
+#[cfg(not(feature = "hashbrown"))]
+use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "cstr_core")]
-use cstr_core::CString;
+use cstr_core::{CStr, CString};
+
+#[cfg(not(feature = "cstr_core"))]
+use std::ffi::{CStr, CString};
 
 #[cfg(feature = "std")]
-use std::{io, iter};
+use std::{io, string::String, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 
-#[cfg(feature = "std")]
-use std::{boxed::Box, string::String, vec::Vec};
-
+pub type ValidationResult = core::result::Result<(), String>;
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
-
-pub type BoxedValidateIterator<'a> = Box<dyn Iterator<Item = String> + 'a>;
 
 #[cfg(feature = "std")]
 pub trait Writes<W: io::Write> {
     fn write_to(&self, writer: &mut W) -> io::Result<()>;
 }
 
-#[cfg(feature = "std")]
-pub trait Validate<'a> {
-    fn validate(&'a self) -> BoxedValidateIterator<'a>;
+pub trait Validates {
+    fn validate(&self) -> Result<(), String>;
 }
 
 #[cfg(feature = "std")]
-pub trait AstElement<'a, W: io::Write>: Writes<W> + Validate<'a> {}
+pub trait AstElement<W: io::Write>: Writes<W> + Validates {}
 
 pub struct QuakeMap {
     pub entities: Vec<Entity>,
@@ -58,57 +53,13 @@ impl<W: io::Write> Writes<W> for QuakeMap {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for QuakeMap {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let worldspawn_classname_msg =
-            String::from("Entity 0: Must have classname of `worldspawn`");
-
-        let worldspawn_brush_msg =
-            String::from("Entity 0: Must be a brush entity");
-
-        let validate_worldspawn_edict = |edict: &Edict| {
-            if let Some(classname) =
-                edict.get(&CString::new(&b"classname"[..]).unwrap())
-            {
-                if classname.as_bytes() == b"worldspawn" {
-                    None.into_iter()
-                } else {
-                    Some(worldspawn_classname_msg).into_iter()
-                }
-            } else {
-                Some(worldspawn_classname_msg).into_iter()
-            }
-        };
-
-        if self.entities.is_empty() {
-            return Box::new(iter::once(String::from("Zero entities in map")));
+impl Validates for QuakeMap {
+    fn validate(&self) -> ValidationResult {
+        for ent in &self.entities {
+            ent.validate()?;
         }
 
-        let validate_worldspawn: BoxedValidateIterator<'a> =
-            match &self.entities[0] {
-                Entity::Point(edict) => Box::new(
-                    validate_worldspawn_edict(edict)
-                        .chain(iter::once(worldspawn_brush_msg)),
-                ),
-                Entity::Brush(edict, _) => {
-                    Box::new(validate_worldspawn_edict(edict))
-                }
-            };
-
-        Box::new(
-            validate_worldspawn.chain(
-                self.entities
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, ent)| {
-                        let prepend_index =
-                            move |msg| format!("Entity {}: {}", idx, msg);
-                        ent.validate().map(prepend_index)
-                    })
-                    .flatten(),
-            ),
-        )
+        Ok(())
     }
 }
 
@@ -146,31 +97,17 @@ impl<W: io::Write> Writes<W> for Entity {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for Entity {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        match self {
-            Entity::Point(edict) => edict.validate(),
-            Entity::Brush(edict, brushes) => {
-                let validate_brushes = brushes
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, brush)| {
-                        let prepend_brush =
-                            move |msg| format!("Brush {}: {}", idx, msg);
-                        brush.validate().map(prepend_brush)
-                    })
-                    .flatten();
+impl Validates for Entity {
+    fn validate(&self) -> ValidationResult {
+        self.edict().validate()?;
 
-                if brushes.is_empty() {
-                    Box::new(edict.validate().chain(iter::once(String::from(
-                        "Brush entity with 0 brushes",
-                    ))))
-                } else {
-                    Box::new(edict.validate().chain(validate_brushes))
-                }
+        if let Entity::Brush(_, brushes) = self {
+            for brush in brushes {
+                brush.validate()?;
             }
         }
+
+        Ok(())
     }
 }
 
@@ -190,52 +127,14 @@ impl<W: io::Write> Writes<W> for Edict {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for Edict {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let validate_classname =
-            match self.get(&CString::new(&b"classname"[..]).unwrap()) {
-                None => Some(String::from("Missing classname")).into_iter(),
-                Some(v) if v.as_bytes() == b"" => {
-                    Some(String::from("Empty classname")).into_iter()
-                }
-                _ => None.into_iter(),
-            };
+impl Validates for Edict {
+    fn validate(&self) -> ValidationResult {
+        for (k, v) in self {
+            validate_keyvalue(k)?;
+            validate_keyvalue(v)?;
+        }
 
-        let validate_keyvalues = self
-            .iter()
-            .map(|(k, v)| {
-                let k_bytes = k.as_bytes();
-                let k_string = String::from_utf8_lossy(k_bytes);
-                let v_bytes = v.as_bytes();
-                let v_string = String::from_utf8_lossy(v_bytes);
-
-                let validate_k = if k_bytes.contains(&b'"') {
-                    Some(format!(
-                        "Key `{}` contains illegal characters",
-                        k_string
-                    ))
-                    .into_iter()
-                } else {
-                    None.into_iter()
-                };
-
-                let validate_v = if v_bytes.contains(&b'"') {
-                    Some(format!(
-                        "Key `{}` has value `{}` \
-                            with illegal characters",
-                        k_string, v_string
-                    ))
-                    .into_iter()
-                } else {
-                    None.into_iter()
-                };
-
-                validate_k.chain(validate_v)
-            })
-            .flatten();
-
-        Box::new(validate_classname.chain(validate_keyvalues))
+        Ok(())
     }
 }
 
@@ -256,26 +155,13 @@ impl<W: io::Write> Writes<W> for Brush {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for Brush {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let validate_surface_count = if self.len() < 4 {
-            Some(String::from("Surface count < 4")).into_iter()
-        } else {
-            None.into_iter()
-        };
+impl Validates for Brush {
+    fn validate(&self) -> ValidationResult {
+        for surface in self {
+            surface.validate()?;
+        }
 
-        let validate_surfaces = self
-            .iter()
-            .enumerate()
-            .map(|(idx, surf)| {
-                let prepend_surf =
-                    move |msg| format!("Surface {}: {}", idx, msg);
-                surf.validate().map(prepend_surf)
-            })
-            .flatten();
-
-        Box::new(validate_surface_count.chain(validate_surfaces))
+        Ok(())
     }
 }
 
@@ -297,28 +183,11 @@ impl<W: io::Write> Writes<W> for Surface {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for Surface {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        //let check_char = |&ch: &u8| ch.is_ascii_whitespace();
-
-        let validate_texture =
-            if self.texture.as_bytes().iter().any(u8::is_ascii_whitespace) {
-                Some(format!(
-                    "Texture `{}` has illegal characters",
-                    String::from_utf8_lossy(self.texture.as_bytes())
-                ))
-                .into_iter()
-            } else {
-                None.into_iter()
-            };
-
-        Box::new(
-            self.half_space
-                .validate()
-                .chain(validate_texture)
-                .chain(self.alignment.validate()),
-        )
+impl Validates for Surface {
+    fn validate(&self) -> ValidationResult {
+        self.half_space.validate()?;
+        validate_texture(&self.texture)?;
+        self.alignment.validate()
     }
 }
 
@@ -344,25 +213,14 @@ impl<W: io::Write> Writes<W> for HalfSpace {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for HalfSpace {
+impl Validates for HalfSpace {
     #[allow(clippy::float_cmp)]
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let validate_coords = self
-            .iter()
-            .map(|pt| pt.iter())
-            .flatten()
-            .map(|float| float.validate())
-            .flatten();
+    fn validate(&self) -> ValidationResult {
+        for point in self {
+            point.validate()?;
+        }
 
-        let validate_triangle =
-            if self[0] == self[1] || self[0] == self[2] || self[1] == self[2] {
-                Some(String::from("Degenerate triangle")).into_iter()
-            } else {
-                None.into_iter()
-            };
-
-        Box::new(validate_coords.chain(validate_triangle))
+        Ok(())
     }
 }
 
@@ -411,30 +269,17 @@ impl<W: io::Write> Writes<W> for Alignment {
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for Alignment {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        let validate_tex_axis = |vec: &'a Vec3| {
-            vec.iter().map(|float| float.validate()).flatten().chain(
-                if vec[0] == 0.0 && vec[1] == 0.0 && vec[2] == 0.0 {
-                    Some(format!(
-                        "Texture axis `{} {} {}` is directionless",
-                        vec[0], vec[1], vec[2]
-                    ))
-                    .into_iter()
-                } else {
-                    None.into_iter()
-                },
-            )
-        };
-
+impl Validates for Alignment {
+    fn validate(&self) -> ValidationResult {
         match self {
-            Alignment::Standard(base) => Box::new(base.validate()),
-            Alignment::Valve220 { base, axes: [u, v] } => Box::new(
-                base.validate()
-                    .chain(validate_tex_axis(u))
-                    .chain(validate_tex_axis(v)),
-            ),
+            Alignment::Standard(base) => base.validate(),
+            Alignment::Valve220 { base, axes } => {
+                base.validate()?;
+                for axis in axes {
+                    axis.validate()?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -445,29 +290,57 @@ pub struct BaseAlignment {
     pub scale: Vec2,
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for BaseAlignment {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        Box::new(
-            self.offset
-                .iter()
-                .map(|float| float.validate())
-                .flatten()
-                .chain(self.rotation.validate())
-                .chain(
-                    self.scale.iter().map(|float| float.validate()).flatten(),
-                ),
-        )
+impl Validates for BaseAlignment {
+    fn validate(&self) -> ValidationResult {
+        self.offset.validate()?;
+        self.rotation.validate()?;
+        self.scale.validate()
     }
 }
 
-#[cfg(feature = "std")]
-impl<'a> Validate<'a> for f64 {
-    fn validate(&'a self) -> BoxedValidateIterator<'a> {
-        Box::new(if self.is_finite() {
-            None.into_iter()
-        } else {
-            Some(format!("Non-finite number `{}`", self)).into_iter()
-        })
+impl<const N: usize> Validates for [f64; N] {
+    fn validate(&self) -> ValidationResult {
+        for num in self {
+            num.validate()?;
+        }
+
+        Ok(())
     }
+}
+
+impl Validates for f64 {
+    fn validate(&self) -> ValidationResult {
+        if self.is_finite() {
+            Ok(())
+        } else {
+            Err(format!("Non-finite number ({})", *self))
+        }
+    }
+}
+
+fn validate_keyvalue(s: &CStr) -> ValidationResult {
+    #[cfg(feature = "hashbrown")]
+    let bad_chars: HashSet<u8> = [b'"', b'\r', b'\n'].iter().cloned().collect();
+    #[cfg(not(feature = "hashbrown"))]
+    let bad_chars = HashSet::from([b'"', b'\r', b'\n']);
+    validate_cstr(s, bad_chars)
+}
+
+fn validate_texture(s: &CStr) -> ValidationResult {
+    #[cfg(feature = "hashbrown")]
+    let bad_chars: HashSet<u8> =
+        [b' ', b'\t', b'\r', b'\n'].iter().cloned().collect();
+    #[cfg(not(feature = "hashbrown"))]
+    let bad_chars = HashSet::from([b' ', b'\t', b'\r', b'\n']);
+    validate_cstr(s, bad_chars)
+}
+
+fn validate_cstr(s: &CStr, bad_chars: HashSet<u8>) -> ValidationResult {
+    for ch in s.to_bytes() {
+        if bad_chars.contains(ch) {
+            return Err(format!("Key/value has illegal character ({})", ch));
+        }
+    }
+
+    Ok(())
 }

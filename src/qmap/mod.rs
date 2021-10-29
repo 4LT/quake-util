@@ -11,11 +11,11 @@ pub mod result;
 
 pub use repr::{
     Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
-    Surface, Vec2, Vec3,
+    Surface, Validates, Vec2, Vec3,
 };
 
 #[cfg(feature = "std")]
-pub use repr::{AstElement, Validate, Writes};
+pub use repr::{AstElement, Writes};
 
 #[cfg(feature = "std")]
 pub use parser::parse;
