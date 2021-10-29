@@ -226,10 +226,16 @@ impl Validates for HalfSpace {
 
 pub enum Alignment {
     Standard(BaseAlignment),
-    Valve220 {
-        base: BaseAlignment,
-        axes: [Vec3; 2],
-    },
+    Valve220(BaseAlignment, [Vec3; 2]),
+}
+
+impl Alignment {
+    pub fn base(&self) -> &BaseAlignment {
+        match self {
+            Alignment::Standard(base) => base,
+            Alignment::Valve220(base, _) => base,
+        }
+    }
 }
 
 #[cfg(feature = "std")]
@@ -247,7 +253,7 @@ impl<W: io::Write> Writes<W> for Alignment {
                     base.scale[1]
                 )?;
             }
-            Alignment::Valve220 { base, axes: [u, v] } => {
+            Alignment::Valve220(base, [u, v]) => {
                 write!(
                     writer,
                     "[ {} {} {} {} ] [ {} {} {} {} ] {} {} {}",
@@ -273,7 +279,7 @@ impl Validates for Alignment {
     fn validate(&self) -> ValidationResult {
         match self {
             Alignment::Standard(base) => base.validate(),
-            Alignment::Valve220 { base, axes } => {
+            Alignment::Valve220(base, axes) => {
                 base.validate()?;
                 for axis in axes {
                     axis.validate()?;
