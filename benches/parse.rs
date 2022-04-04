@@ -21,17 +21,28 @@ mod test {
 */
 
 #[cfg(test)]
-#[bench]
-fn bench_parse(bench: &mut Bencher) {
-    bench.iter(|| {
-        let f = File::open("test-res/ad_heresp2.map").unwrap();
+mod benchmarks {
+
+    use crate::*;
+
+    fn parse_file(file_name: &str) {
+        let f = File::open(file_name).unwrap();
         let reader = BufReader::new(f);
-
-        let ast = match parse(reader) {
-            Ok(ast) => ast,
-            Err(err) => panic!("{}", err),
-        };
-
+        let ast = parse(reader).unwrap();
         ast.write_to(&mut sink()).unwrap();
-    });
+    }
+
+    #[bench]
+    fn parse_lg_file(bench: &mut Bencher) {
+        bench.iter(|| {
+            parse_file("test-res/ad_heresp2.map");
+        });
+    }
+
+    #[bench]
+    fn parse_sm_file(bench: &mut Bencher) {
+        bench.iter(|| {
+            parse_file("test-res/standard.map");
+        });
+    }
 }
