@@ -1,20 +1,13 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-use std::{
-    io::Read,
-    iter::Peekable,
-    num::NonZeroU8,
-    str::FromStr,
-    vec::Vec
-};
+use std::{io::Read, iter::Peekable, num::NonZeroU8, str::FromStr, vec::Vec};
 
 use crate::qmap;
-use qmap::repr::{
-    Alignment, BaseAlignment, Brush, Edict, Entity, Point, QuakeMap,
-    Surface,
-};
 use qmap::lexer::{Token, TokenIterator};
+use qmap::repr::{
+    Alignment, BaseAlignment, Brush, Edict, Entity, Point, QuakeMap, Surface,
+};
 
 type TokenPeekable<R> = Peekable<TokenIterator<R>>;
 const MIN_BRUSH_SURFACES: usize = 4;
@@ -180,14 +173,14 @@ fn parse_valve_alignment<R: Read>(
     let scale_x = expect_float(&tokens.next().transpose()?)?;
     let scale_y = expect_float(&tokens.next().transpose()?)?;
 
-    Ok(Alignment::Valve220 {
-        base: BaseAlignment {
+    Ok(Alignment::Valve220(
+        BaseAlignment {
             offset: [offset_x, offset_y],
             rotation,
             scale: [scale_x, scale_y],
         },
-        axes: [[u_x, u_y, u_z], [v_x, v_y, v_z]],
-    })
+        [[u_x, u_y, u_z], [v_x, v_y, v_z]],
+    ))
 }
 
 fn expect_byte(token: &Option<Token>, byte: u8) -> qmap::Result<()> {

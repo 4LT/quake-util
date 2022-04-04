@@ -4,11 +4,10 @@ extern crate std;
 use std::{
     cell::RefCell,
     convert::TryInto,
-    fmt,
-    io,
+    fmt, io,
     num::{NonZeroU64, NonZeroU8},
+    string::String,
     vec::Vec,
-    string::String
 };
 
 use crate::qmap;
