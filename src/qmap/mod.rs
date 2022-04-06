@@ -22,3 +22,8 @@ pub use parser::parse;
 
 #[cfg(feature = "std")]
 pub use result::{Error, LineError, Result};
+
+// test suites
+
+#[cfg(test)]
+mod parser_test;
