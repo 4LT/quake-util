@@ -25,5 +25,5 @@ pub use result::{Error, LineError, Result};
 
 // test suites
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod parser_test;

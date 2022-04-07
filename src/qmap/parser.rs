@@ -102,12 +102,14 @@ fn parse_surface<R: Read>(
 
     let half_space = [pt1, pt2, pt3];
 
-    let texture = tokens
-        .next()
-        .transpose()?
-        .ok_or_else(qmap::Error::eof)?
-        .text
-        .into();
+    let texture_token =
+        &tokens.next().transpose()?.ok_or_else(qmap::Error::eof)?;
+
+    let texture = if b'"' == (&texture_token.text)[0].into() {
+        strip_quoted(&texture_token.text[..]).to_vec().into()
+    } else {
+        texture_token.text.clone().into()
+    };
 
     let alignment = if let Some(tok_res) = tokens.peek() {
         if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'[') {
