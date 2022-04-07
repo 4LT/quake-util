@@ -29,7 +29,8 @@ fn parse_empty_map() {
 #[test]
 fn parse_token_error() {
     let err = parse(&b"\""[..]).err().unwrap();
-    if let qmap::result::Error::Lexer(_) = err {
+    if let qmap::result::Error::Lexer(lex_err) = err {
+        assert_eq!(u64::from(lex_err.line_number.unwrap()), 1u64);
     } else {
         panic!("Unexpected error variant for {}", err);
     }
