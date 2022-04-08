@@ -15,7 +15,7 @@ use crate::qmap::Result;
 
 const TEXT_CAPACITY: usize = 32;
 
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Token {
     pub text: Vec<NonZeroU8>,
     pub line_number: NonZeroU64,
@@ -93,7 +93,8 @@ impl<R: io::Read> TokenIterator<R> {
     fn eof_read(&mut self) -> Result<Option<Token>> {
         if let Some(last_text) = self.text.replace(None) {
             if last_text[0] == NonZeroU8::new(b'"').unwrap()
-                && last_text.last() != NonZeroU8::new(b'"').as_ref()
+                && (last_text.last() != NonZeroU8::new(b'"').as_ref()
+                    || last_text.len() == 1)
             {
                 Err(qmap::Error::from_lexer(
                     String::from("Missing closing quote"),

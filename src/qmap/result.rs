@@ -50,7 +50,7 @@ impl Error {
 
     pub fn eof() -> Error {
         Error::Parser(LineError {
-            message: String::from("Unexpected EOF"),
+            message: String::from("Unexpected end-of-file"),
             line_number: None,
         })
     }

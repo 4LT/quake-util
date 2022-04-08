@@ -22,3 +22,11 @@ pub use parser::parse;
 
 #[cfg(feature = "std")]
 pub use result::{Error, LineError, Result};
+
+// test suites
+
+#[cfg(all(test, feature = "std"))]
+mod parser_test;
+
+#[cfg(all(test, feature = "std"))]
+mod lexer_test;
