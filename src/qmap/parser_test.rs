@@ -209,6 +209,10 @@ fn parse_weird_textures() {
             ( 9 8 7 ) ( 6 5 4 ) ( 9 8 7 )
             "spaced out"
             0 0 0 1 1
+
+            ( 11 12 13 ) ( 23 24 25 ) ( 35 36 37 )
+            silly"example
+            0 0 0 1 1
         } }
     "#[..],
     )
@@ -217,8 +221,10 @@ fn parse_weird_textures() {
     if let Entity::Brush(_, brushes) = &map.entities[0] {
         let surface1 = &(&brushes[0])[0];
         let surface2 = &(&brushes[0])[1];
+        let surface3 = &(&brushes[0])[2];
         assert_eq!(surface1.texture, CString::new("{FENCE").unwrap());
         assert_eq!(surface2.texture, CString::new("spaced out").unwrap());
+        assert_eq!(surface3.texture, CString::new(r#"silly"example"#).unwrap());
     } else {
         panic_expected_brush();
     }

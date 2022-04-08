@@ -27,3 +27,6 @@ pub use result::{Error, LineError, Result};
 
 #[cfg(all(test, feature = "std"))]
 mod parser_test;
+
+#[cfg(all(test, feature = "std"))]
+mod lexer_test;

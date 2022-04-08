@@ -15,7 +15,7 @@ use crate::qmap::Result;
 
 const TEXT_CAPACITY: usize = 32;
 
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Token {
     pub text: Vec<NonZeroU8>,
     pub line_number: NonZeroU64,
