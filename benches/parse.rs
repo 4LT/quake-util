@@ -8,25 +8,16 @@ use test::Bencher;
 
 use quake_util::qmap::{parse, Writes};
 
-/*
-mod test {
-    pub struct Bencher {}
-
-    impl Bencher {
-        pub fn iter(&self, func: &dyn Fn() -> ()) {
-            func();
-        }
-    }
-}
-*/
+mod bench_util;
+use bench_util::prepare_file;
 
 #[cfg(test)]
 mod benchmarks {
 
     use crate::*;
 
-    fn parse_file(file_name: &str) {
-        let f = File::open(file_name).unwrap();
+    fn parse_file(file_path: &str) {
+        let f = File::open(file_path).unwrap();
         let reader = BufReader::new(f);
         let ast = parse(reader).unwrap();
         ast.write_to(&mut sink()).unwrap();
@@ -34,15 +25,19 @@ mod benchmarks {
 
     #[bench]
     fn parse_lg_file(bench: &mut Bencher) {
+        let file_path = prepare_file("ad_heresp2.map").unwrap();
+
         bench.iter(|| {
-            parse_file("test-res/ad_heresp2.map");
+            parse_file(&file_path);
         });
     }
 
     #[bench]
     fn parse_sm_file(bench: &mut Bencher) {
+        let file_path = prepare_file("standard.map").unwrap();
+
         bench.iter(|| {
-            parse_file("test-res/standard.map");
+            parse_file(&file_path);
         });
     }
 }
