@@ -3,10 +3,10 @@
 extern crate test;
 
 use std::fs::File;
-use std::io::{sink, BufReader};
+use std::io::BufReader;
 use test::Bencher;
 
-use quake_util::qmap::{parse, Writes};
+use quake_util::qmap::parse;
 
 mod bench_util;
 use bench_util::prepare_file;
@@ -19,8 +19,7 @@ mod benchmarks {
     fn parse_file(file_path: &str) {
         let f = File::open(file_path).unwrap();
         let reader = BufReader::new(f);
-        let ast = parse(reader).unwrap();
-        ast.write_to(&mut sink()).unwrap();
+        let _ = parse(reader).unwrap();
     }
 
     #[bench]
