@@ -11,7 +11,7 @@ use hashbrown::HashMap;
 use std::collections::HashMap;
 
 #[cfg(feature = "cstr_core")]
-use cstr_core::{CStr, CString};
+use cstr_core::CString;
 
 #[cfg(not(feature = "cstr_core"))]
 use std::ffi::{CStr, CString};
@@ -203,6 +203,7 @@ impl Alignment {
         }
     }
 
+    #[cfg(feature = "std")]
     fn check_writable(&self) -> io::Result<()> {
         match self {
             Alignment::Standard(base) => base.check_writable(),
@@ -263,8 +264,9 @@ pub struct BaseAlignment {
     pub scale: Vec2,
 }
 
+#[cfg(feature = "std")]
 impl BaseAlignment {
-    pub fn check_writable(&self) -> io::Result<()> {
+    fn check_writable(&self) -> io::Result<()> {
         check_writable_array(self.offset)?;
         check_writable_f64(self.rotation)?;
         check_writable_array(self.scale)?;
@@ -272,6 +274,7 @@ impl BaseAlignment {
     }
 }
 
+#[cfg(feature = "std")]
 fn check_writable_array<const N: usize>(arr: [f64; N]) -> io::Result<()> {
     for num in arr {
         check_writable_f64(num)?;
@@ -280,6 +283,7 @@ fn check_writable_array<const N: usize>(arr: [f64; N]) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "std")]
 fn check_writable_f64(num: f64) -> io::Result<()> {
     if num.is_finite() {
         Ok(())
@@ -288,6 +292,7 @@ fn check_writable_f64(num: f64) -> io::Result<()> {
     }
 }
 
+#[cfg(feature = "std")]
 fn check_writable_texture(s: &CStr) -> io::Result<()> {
     if check_writable_unquoted(s).is_ok() {
         return Ok(());
@@ -302,6 +307,7 @@ fn check_writable_texture(s: &CStr) -> io::Result<()> {
     }
 }
 
+#[cfg(feature = "std")]
 fn check_writable_quoted(s: &CStr) -> io::Result<()> {
     let bad_chars = [b'"', b'\r', b'\n'];
 
@@ -317,6 +323,7 @@ fn check_writable_quoted(s: &CStr) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "std")]
 fn check_writable_unquoted(s: &CStr) -> io::Result<()> {
     let s_bytes = s.to_bytes();
 
@@ -337,6 +344,7 @@ fn check_writable_unquoted(s: &CStr) -> io::Result<()> {
     }
 }
 
+#[cfg(feature = "std")]
 fn contains_ascii_whitespace(s: &CStr) -> bool {
     s.to_bytes().iter().any(|c| c.is_ascii_whitespace())
 }
