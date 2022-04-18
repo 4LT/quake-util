@@ -11,7 +11,7 @@ alloc_fills = ["hashbrown", "cstr_core"]
 std = []
 
 [dependencies]
-hashbrown = { version = "^0.11", optional = true }
+hashbrown = { version = "^0.12", optional = true }
 cstr_core = { version = "^0.2", optional = true, features = ["alloc"] }
 
 [dev-dependencies]

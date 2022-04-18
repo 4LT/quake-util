@@ -11,7 +11,7 @@ pub mod result;
 
 pub use repr::{
     Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
-    Surface, Validates, Vec2, Vec3,
+    Surface, Vec2, Vec3,
 };
 
 #[cfg(feature = "std")]
@@ -30,3 +30,6 @@ mod parser_test;
 
 #[cfg(all(test, feature = "std"))]
 mod lexer_test;
+
+#[cfg(test)]
+mod repr_test;

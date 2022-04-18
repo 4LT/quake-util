@@ -1,28 +1,20 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "alloc_fills")]
 extern crate alloc;
 
-#[cfg(feature = "hashbrown")]
-use hashbrown::{HashMap, HashSet};
-
-#[cfg(not(feature = "hashbrown"))]
-use std::collections::{HashMap, HashSet};
-
-#[cfg(feature = "cstr_core")]
-use cstr_core::{CStr, CString};
-
-#[cfg(not(feature = "cstr_core"))]
-use std::ffi::{CStr, CString};
-
 #[cfg(feature = "std")]
-use std::{io, string::String, vec::Vec};
+use std::{
+    collections::HashMap,
+    ffi::{CStr, CString},
+    io,
+    vec::Vec,
+};
 
-#[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+#[cfg(feature = "alloc_fills")]
+use {alloc::vec::Vec, cstr_core::CString, hashbrown::HashMap};
 
-pub type ValidationResult = core::result::Result<(), String>;
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
@@ -30,10 +22,6 @@ pub type Vec2 = [f64; 2];
 #[cfg(feature = "std")]
 pub trait Writes<W: io::Write> {
     fn write_to(&self, writer: &mut W) -> io::Result<()>;
-}
-
-pub trait Validates {
-    fn validate(&self) -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -51,13 +39,11 @@ impl<W: io::Write> Writes<W> for QuakeMap {
     }
 }
 
-impl Validates for QuakeMap {
-    fn validate(&self) -> ValidationResult {
-        for ent in &self.entities {
-            ent.validate()?;
+impl QuakeMap {
+    pub const fn new() -> Self {
+        QuakeMap {
+            entities: Vec::new(),
         }
-
-        Ok(())
     }
 }
 
@@ -74,12 +60,25 @@ impl Entity {
             Self::Brush(edict, _) => edict,
         }
     }
+
+    pub fn edict_mut(&mut self) -> &mut Edict {
+        match *self {
+            Self::Point(ref mut edict) => edict,
+            Self::Brush(ref mut edict, _) => edict,
+        }
+    }
 }
 
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Entity {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
+        for (k, v) in self.edict() {
+            check_writable_quoted(k)?;
+            check_writable_quoted(v)?;
+        }
+
         writer.write_all(b"{\r\n")?;
+
         match self {
             Entity::Brush(edict, brushes) => {
                 edict.write_to(writer)?;
@@ -91,21 +90,8 @@ impl<W: io::Write> Writes<W> for Entity {
                 edict.write_to(writer)?;
             }
         }
+
         writer.write_all(b"}\r\n")?;
-        Ok(())
-    }
-}
-
-impl Validates for Entity {
-    fn validate(&self) -> ValidationResult {
-        self.edict().validate()?;
-
-        if let Entity::Brush(_, brushes) = self {
-            for brush in brushes {
-                brush.validate()?;
-            }
-        }
-
         Ok(())
     }
 }
@@ -122,17 +108,6 @@ impl<W: io::Write> Writes<W> for Edict {
             writer.write_all(value.as_bytes())?;
             writer.write_all(b"\"\r\n")?;
         }
-        Ok(())
-    }
-}
-
-impl Validates for Edict {
-    fn validate(&self) -> ValidationResult {
-        for (k, v) in self {
-            validate_keyvalue(k)?;
-            validate_keyvalue(v)?;
-        }
-
         Ok(())
     }
 }
@@ -154,16 +129,6 @@ impl<W: io::Write> Writes<W> for Brush {
     }
 }
 
-impl Validates for Brush {
-    fn validate(&self) -> ValidationResult {
-        for surface in self {
-            surface.validate()?;
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Clone)]
 pub struct Surface {
     pub half_space: HalfSpace,
@@ -174,20 +139,17 @@ pub struct Surface {
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Surface {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
+        for num in self.half_space.iter().flatten() {
+            check_writable_f64(*num)?;
+        }
+        check_writable_texture(&self.texture)?;
+
         self.half_space.write_to(writer)?;
         writer.write_all(b" ")?;
         writer.write_all(self.texture.as_bytes())?;
         writer.write_all(b" ")?;
         self.alignment.write_to(writer)?;
         Ok(())
-    }
-}
-
-impl Validates for Surface {
-    fn validate(&self) -> ValidationResult {
-        self.half_space.validate()?;
-        validate_texture(&self.texture)?;
-        self.alignment.validate()
     }
 }
 
@@ -213,17 +175,6 @@ impl<W: io::Write> Writes<W> for HalfSpace {
     }
 }
 
-impl Validates for HalfSpace {
-    #[allow(clippy::float_cmp)]
-    fn validate(&self) -> ValidationResult {
-        for point in self {
-            point.validate()?;
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Clone, Copy)]
 pub enum Alignment {
     Standard(BaseAlignment),
@@ -237,11 +188,34 @@ impl Alignment {
             Alignment::Valve220(base, _) => base,
         }
     }
+
+    pub fn base_mut(&mut self) -> &mut BaseAlignment {
+        match *self {
+            Alignment::Standard(ref mut base) => base,
+            Alignment::Valve220(ref mut base, _) => base,
+        }
+    }
+
+    #[cfg(feature = "std")]
+    fn check_writable(&self) -> io::Result<()> {
+        match self {
+            Alignment::Standard(base) => base.check_writable(),
+            Alignment::Valve220(base, axes) => {
+                base.check_writable()?;
+                for axis in axes {
+                    check_writable_array(*axis)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Alignment {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
+        self.check_writable()?;
+
         match self {
             Alignment::Standard(base) => {
                 write!(
@@ -276,21 +250,6 @@ impl<W: io::Write> Writes<W> for Alignment {
     }
 }
 
-impl Validates for Alignment {
-    fn validate(&self) -> ValidationResult {
-        match self {
-            Alignment::Standard(base) => base.validate(),
-            Alignment::Valve220(base, axes) => {
-                base.validate()?;
-                for axis in axes {
-                    axis.validate()?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 pub struct BaseAlignment {
     pub offset: Vec2,
@@ -298,57 +257,87 @@ pub struct BaseAlignment {
     pub scale: Vec2,
 }
 
-impl Validates for BaseAlignment {
-    fn validate(&self) -> ValidationResult {
-        self.offset.validate()?;
-        self.rotation.validate()?;
-        self.scale.validate()
-    }
-}
-
-impl<const N: usize> Validates for [f64; N] {
-    fn validate(&self) -> ValidationResult {
-        for num in self {
-            num.validate()?;
-        }
-
+#[cfg(feature = "std")]
+impl BaseAlignment {
+    fn check_writable(&self) -> io::Result<()> {
+        check_writable_array(self.offset)?;
+        check_writable_f64(self.rotation)?;
+        check_writable_array(self.scale)?;
         Ok(())
     }
 }
 
-impl Validates for f64 {
-    fn validate(&self) -> ValidationResult {
-        if self.is_finite() {
-            Ok(())
-        } else {
-            Err(format!("Non-finite number ({})", *self))
-        }
+#[cfg(feature = "std")]
+fn check_writable_array<const N: usize>(arr: [f64; N]) -> io::Result<()> {
+    for num in arr {
+        check_writable_f64(num)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "std")]
+fn check_writable_f64(num: f64) -> io::Result<()> {
+    if num.is_finite() {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!("Non-finite number ({})", num)))
     }
 }
 
-fn validate_keyvalue(s: &CStr) -> ValidationResult {
-    #[cfg(feature = "hashbrown")]
-    let bad_chars: HashSet<u8> = [b'"', b'\r', b'\n'].iter().cloned().collect();
-    #[cfg(not(feature = "hashbrown"))]
-    let bad_chars = HashSet::from([b'"', b'\r', b'\n']);
-    validate_cstr(s, bad_chars)
+#[cfg(feature = "std")]
+fn check_writable_texture(s: &CStr) -> io::Result<()> {
+    if check_writable_unquoted(s).is_ok() {
+        return Ok(());
+    }
+
+    match check_writable_quoted(s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(io::Error::other(format!(
+            "Cannot write texture {:?}, not quotable and contains whitespace",
+            s
+        ))),
+    }
 }
 
-fn validate_texture(s: &CStr) -> ValidationResult {
-    #[cfg(feature = "hashbrown")]
-    let bad_chars: HashSet<u8> =
-        [b' ', b'\t', b'\r', b'\n'].iter().cloned().collect();
-    #[cfg(not(feature = "hashbrown"))]
-    let bad_chars = HashSet::from([b' ', b'\t', b'\r', b'\n']);
-    validate_cstr(s, bad_chars)
-}
+#[cfg(feature = "std")]
+fn check_writable_quoted(s: &CStr) -> io::Result<()> {
+    let bad_chars = [b'"', b'\r', b'\n'];
 
-fn validate_cstr(s: &CStr, bad_chars: HashSet<u8>) -> ValidationResult {
-    for ch in s.to_bytes() {
-        if bad_chars.contains(ch) {
-            return Err(format!("Key/value has illegal character ({})", ch));
+    for c in s.to_bytes() {
+        if bad_chars.contains(c) {
+            return Err(io::Error::other(format!(
+                "Cannot write quote-wrapped string, contains {:?}",
+                char::from(*c)
+            )));
         }
     }
 
     Ok(())
+}
+
+#[cfg(feature = "std")]
+fn check_writable_unquoted(s: &CStr) -> io::Result<()> {
+    let s_bytes = s.to_bytes();
+
+    if s_bytes.is_empty() {
+        return Err(io::Error::other("Cannot write unquoted empty string"));
+    }
+
+    if s_bytes[0] == b'"' {
+        return Err(io::Error::other("Cannot lead unquoted string with quote"));
+    }
+
+    if contains_ascii_whitespace(s) {
+        Err(io::Error::other(
+            "Cannot write unquoted string, contains whitespace",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(feature = "std")]
+fn contains_ascii_whitespace(s: &CStr) -> bool {
+    s.to_bytes().iter().any(|c| c.is_ascii_whitespace())
 }
