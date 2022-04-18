@@ -17,12 +17,11 @@ use cstr_core::{CStr, CString};
 use std::ffi::{CStr, CString};
 
 #[cfg(feature = "std")]
-use std::{io, string::String, vec::Vec};
+use std::{io, vec::Vec};
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 
-pub type ValidationResult = core::result::Result<(), String>;
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
@@ -204,7 +203,7 @@ impl Alignment {
         }
     }
 
-    fn check_writable(&self) -> ValidationResult {
+    fn check_writable(&self) -> io::Result<()> {
         match self {
             Alignment::Standard(base) => base.check_writable(),
             Alignment::Valve220(base, axes) => {
@@ -265,7 +264,7 @@ pub struct BaseAlignment {
 }
 
 impl BaseAlignment {
-    pub fn check_writable(&self) -> ValidationResult {
+    pub fn check_writable(&self) -> io::Result<()> {
         check_writable_array(self.offset)?;
         check_writable_f64(self.rotation)?;
         check_writable_array(self.scale)?;
@@ -273,7 +272,7 @@ impl BaseAlignment {
     }
 }
 
-fn check_writable_array<const N: usize>(arr: [f64; N]) -> ValidationResult {
+fn check_writable_array<const N: usize>(arr: [f64; N]) -> io::Result<()> {
     for num in arr {
         check_writable_f64(num)?;
     }
@@ -281,56 +280,56 @@ fn check_writable_array<const N: usize>(arr: [f64; N]) -> ValidationResult {
     Ok(())
 }
 
-fn check_writable_f64(num: f64) -> ValidationResult {
+fn check_writable_f64(num: f64) -> io::Result<()> {
     if num.is_finite() {
         Ok(())
     } else {
-        Err(format!("Non-finite number ({})", num))
+        Err(io::Error::other(format!("Non-finite number ({})", num)))
     }
 }
 
-fn check_writable_texture(s: &CStr) -> ValidationResult {
+fn check_writable_texture(s: &CStr) -> io::Result<()> {
     if check_writable_unquoted(s).is_ok() {
         return Ok(());
     }
 
     match check_writable_quoted(s) {
         Ok(_) => Ok(()),
-        Err(_) => Err(format!(
+        Err(_) => Err(io::Error::other(format!(
             "Cannot write texture {:?}, not quotable and contains whitespace",
             s
-        )),
+        ))),
     }
 }
 
-fn check_writable_quoted(s: &CStr) -> ValidationResult {
+fn check_writable_quoted(s: &CStr) -> io::Result<()> {
     let bad_chars = [b'"', b'\r', b'\n'];
 
     for c in s.to_bytes() {
         if bad_chars.contains(c) {
-            return Err(format!(
+            return Err(io::Error::other(format!(
                 "Cannot write quote-wrapped string, contains {:?}",
                 char::from(*c)
-            ));
+            )));
         }
     }
 
     Ok(())
 }
 
-fn check_writable_unquoted(s: &CStr) -> ValidationResult {
+fn check_writable_unquoted(s: &CStr) -> io::Result<()> {
     let s_bytes = s.to_bytes();
 
     if s_bytes.is_empty() {
-        return Err(String::from("Cannot write unquoted empty string"));
+        return Err(io::Error::other("Cannot write unquoted empty string"));
     }
 
     if s_bytes[0] == b'"' {
-        return Err(String::from("Cannot lead unquoted string with quote"));
+        return Err(io::Error::other("Cannot lead unquoted string with quote"));
     }
 
     if contains_ascii_whitespace(s) {
-        Err(String::from(
+        Err(io::Error::other(
             "Cannot write unquoted string, contains whitespace",
         ))
     } else {
