@@ -53,14 +53,6 @@ impl QuakeMap {
             entities: Vec::new(),
         }
     }
-
-    pub fn check_writable(&self) -> ValidationResult {
-        for ent in &self.entities {
-            ent.check_writable()?;
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(Clone)]
@@ -88,7 +80,11 @@ impl Entity {
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Entity {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
-        self.check_writable().map_err(io::Error::other)?;
+        for (k, v) in self.edict() {
+            check_writable_quoted(k).map_err(io::Error::other)?;
+            check_writable_quoted(v).map_err(io::Error::other)?;
+        }
+
         writer.write_all(b"{\r\n")?;
 
         match self {
@@ -104,23 +100,6 @@ impl<W: io::Write> Writes<W> for Entity {
         }
 
         writer.write_all(b"}\r\n")?;
-        Ok(())
-    }
-}
-
-impl Entity {
-    pub fn check_writable(&self) -> ValidationResult {
-        for (k, v) in self.edict() {
-            check_writable_quoted(k)?;
-            check_writable_quoted(v)?;
-        }
-
-        if let Entity::Brush(_, brushes) = self {
-            for surface in brushes.iter().flatten() {
-                surface.check_writable()?;
-            }
-        }
-
         Ok(())
     }
 }
@@ -168,23 +147,17 @@ pub struct Surface {
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Surface {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
-        self.check_writable().map_err(io::Error::other)?;
+        for num in self.half_space.iter().flatten() {
+            check_writable_f64(*num).map_err(io::Error::other)?;
+        }
+        check_writable_texture(&self.texture).map_err(io::Error::other)?;
+
         self.half_space.write_to(writer)?;
         writer.write_all(b" ")?;
         writer.write_all(self.texture.as_bytes())?;
         writer.write_all(b" ")?;
         self.alignment.write_to(writer)?;
         Ok(())
-    }
-}
-
-impl Surface {
-    pub fn check_writable(&self) -> ValidationResult {
-        for num in self.half_space.iter().flatten() {
-            check_writable_f64(*num)?;
-        }
-        check_writable_texture(&self.texture)?;
-        self.alignment.check_writable()
     }
 }
 
@@ -231,7 +204,7 @@ impl Alignment {
         }
     }
 
-    pub fn check_writable(&self) -> ValidationResult {
+    fn check_writable(&self) -> ValidationResult {
         match self {
             Alignment::Standard(base) => base.check_writable(),
             Alignment::Valve220(base, axes) => {
