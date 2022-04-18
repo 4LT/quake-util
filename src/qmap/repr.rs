@@ -88,7 +88,9 @@ impl Entity {
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Entity {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
+        self.check_writable().map_err(io::Error::other)?;
         writer.write_all(b"{\r\n")?;
+
         match self {
             Entity::Brush(edict, brushes) => {
                 edict.write_to(writer)?;
@@ -100,6 +102,7 @@ impl<W: io::Write> Writes<W> for Entity {
                 edict.write_to(writer)?;
             }
         }
+
         writer.write_all(b"}\r\n")?;
         Ok(())
     }
@@ -165,6 +168,7 @@ pub struct Surface {
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Surface {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
+        self.check_writable().map_err(io::Error::other)?;
         self.half_space.write_to(writer)?;
         writer.write_all(b" ")?;
         writer.write_all(self.texture.as_bytes())?;
@@ -226,11 +230,26 @@ impl Alignment {
             Alignment::Valve220(ref mut base, _) => base,
         }
     }
+
+    pub fn check_writable(&self) -> ValidationResult {
+        match self {
+            Alignment::Standard(base) => base.check_writable(),
+            Alignment::Valve220(base, axes) => {
+                base.check_writable()?;
+                for axis in axes {
+                    check_writable_array(*axis)?;
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Alignment {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
+        self.check_writable().map_err(io::Error::other)?;
+
         match self {
             Alignment::Standard(base) => {
                 write!(
@@ -262,21 +281,6 @@ impl<W: io::Write> Writes<W> for Alignment {
             }
         }
         Ok(())
-    }
-}
-
-impl Alignment {
-    pub fn check_writable(&self) -> ValidationResult {
-        match self {
-            Alignment::Standard(base) => base.check_writable(),
-            Alignment::Valve220(base, axes) => {
-                base.check_writable()?;
-                for axis in axes {
-                    check_writable_array(*axis)?;
-                }
-                Ok(())
-            }
-        }
     }
 }
 
