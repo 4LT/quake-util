@@ -121,6 +121,26 @@ fn bad_map_edict() -> QuakeMap {
 // Successes
 
 #[test]
+fn mutable_edict() {
+    let mut ent = Entity::Point(Edict::new());
+    let key = CString::new("skin").unwrap();
+    let value = CString::new("value").unwrap();
+
+    ent.edict_mut().insert(key.clone(), value.clone());
+
+    assert_eq!(ent.edict().get(&key), Some(&value));
+}
+
+#[test]
+fn mutable_base_alignment() {
+    let mut alignment = GOOD_ALIGNMENT;
+
+    alignment.base_mut().rotation = 12.0;
+
+    assert_eq!(alignment.base().rotation, 12.0);
+}
+
+#[test]
 fn check_simple_map() {
     assert_eq!(simple_map().check_writable(), Ok(()));
 }
@@ -137,8 +157,8 @@ fn check_bad_entities() {
     let bad_edict_strings = ["\"", "\n", "\r"];
     let bad_edict_chars = bad_edict_strings
         .into_iter()
-        .map(|s| char::from(s.as_bytes()[0]));
-    let good_edict_strings = core::iter::repeat("hello").take(3);
+        .map(|s| s.chars().next().unwrap());
+    let good_edict_strings = ["hello", "evening", "bye"].into_iter();
 
     let bad_char_iter = bad_edict_chars.clone().chain(bad_edict_chars.clone());
 

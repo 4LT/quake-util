@@ -76,6 +76,13 @@ impl Entity {
             Self::Brush(edict, _) => edict,
         }
     }
+
+    pub fn edict_mut(&mut self) -> &mut Edict {
+        match *self {
+            Self::Point(ref mut edict) => edict,
+            Self::Brush(ref mut edict, _) => edict,
+        }
+    }
 }
 
 #[cfg(feature = "std")]
@@ -212,6 +219,13 @@ impl Alignment {
             Alignment::Valve220(base, _) => base,
         }
     }
+
+    pub fn base_mut(&mut self) -> &mut BaseAlignment {
+        match *self {
+            Alignment::Standard(ref mut base) => base,
+            Alignment::Valve220(ref mut base, _) => base,
+        }
+    }
 }
 
 #[cfg(feature = "std")]
@@ -299,7 +313,7 @@ fn check_writable_f64(num: f64) -> ValidationResult {
 }
 
 fn check_writable_texture(s: &CStr) -> ValidationResult {
-    if let Ok(_) = check_writable_unquoted(s) {
+    if check_writable_unquoted(s).is_ok() {
         return Ok(());
     }
 
@@ -330,7 +344,7 @@ fn check_writable_quoted(s: &CStr) -> ValidationResult {
 fn check_writable_unquoted(s: &CStr) -> ValidationResult {
     let s_bytes = s.to_bytes();
 
-    if s_bytes.len() < 1 {
+    if s_bytes.is_empty() {
         return Err(String::from("Cannot write unquoted empty string"));
     }
 
