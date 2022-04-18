@@ -80,8 +80,8 @@ impl Entity {
 impl<W: io::Write> Writes<W> for Entity {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for (k, v) in self.edict() {
-            check_writable_quoted(k).map_err(io::Error::other)?;
-            check_writable_quoted(v).map_err(io::Error::other)?;
+            check_writable_quoted(k)?;
+            check_writable_quoted(v)?;
         }
 
         writer.write_all(b"{\r\n")?;
@@ -147,9 +147,9 @@ pub struct Surface {
 impl<W: io::Write> Writes<W> for Surface {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
         for num in self.half_space.iter().flatten() {
-            check_writable_f64(*num).map_err(io::Error::other)?;
+            check_writable_f64(*num)?;
         }
-        check_writable_texture(&self.texture).map_err(io::Error::other)?;
+        check_writable_texture(&self.texture)?;
 
         self.half_space.write_to(writer)?;
         writer.write_all(b" ")?;
@@ -220,7 +220,7 @@ impl Alignment {
 #[cfg(feature = "std")]
 impl<W: io::Write> Writes<W> for Alignment {
     fn write_to(&self, writer: &mut W) -> io::Result<()> {
-        self.check_writable().map_err(io::Error::other)?;
+        self.check_writable()?;
 
         match self {
             Alignment::Standard(base) => {
