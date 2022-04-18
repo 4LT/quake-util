@@ -31,5 +31,5 @@ mod parser_test;
 #[cfg(all(test, feature = "std"))]
 mod lexer_test;
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod repr_test;

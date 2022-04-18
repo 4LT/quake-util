@@ -1,26 +1,19 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "alloc_fills")]
 extern crate alloc;
 
-#[cfg(feature = "hashbrown")]
-use hashbrown::HashMap;
-
-#[cfg(not(feature = "hashbrown"))]
-use std::collections::HashMap;
-
-#[cfg(feature = "cstr_core")]
-use cstr_core::CString;
-
-#[cfg(not(feature = "cstr_core"))]
-use std::ffi::{CStr, CString};
-
 #[cfg(feature = "std")]
-use std::{io, vec::Vec};
+use std::{
+    collections::HashMap,
+    ffi::{CStr, CString},
+    io,
+    vec::Vec,
+};
 
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+#[cfg(feature = "alloc_fills")]
+use {alloc::vec::Vec, cstr_core::CString, hashbrown::HashMap};
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
