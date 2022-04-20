@@ -9,6 +9,7 @@ use std::{
     collections::HashMap,
     ffi::{CStr, CString},
     io,
+    string::String,
     vec::Vec,
 };
 
@@ -18,6 +19,7 @@ use {alloc::vec::Vec, cstr_core::CString, hashbrown::HashMap};
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
+pub type ValidationResult = Result<(), String>;
 
 #[cfg(feature = "std")]
 pub trait Writes<W: io::Write> {
@@ -44,6 +46,14 @@ impl QuakeMap {
         QuakeMap {
             entities: Vec::new(),
         }
+    }
+
+    pub fn check_writable(&self) -> ValidationResult {
+        for ent in &self.entities {
+            ent.check_writable()?;
+        }
+
+        Ok(())
     }
 }
 
@@ -92,6 +102,23 @@ impl<W: io::Write> Writes<W> for Entity {
         }
 
         writer.write_all(b"}\r\n")?;
+        Ok(())
+    }
+}
+
+impl Entity {
+    pub fn check_writable(&self) -> ValidationResult {
+        for (k, v) in self.edict() {
+            check_writable_quoted(k).map(io::Error::other)?;
+            check_writable_quoted(v)?;
+        }
+
+        if let Entity::Brush(_, brushes) = self {
+            for surface in brushes.iter().flatten() {
+                surface.check_writable()?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -150,6 +177,16 @@ impl<W: io::Write> Writes<W> for Surface {
         writer.write_all(b" ")?;
         self.alignment.write_to(writer)?;
         Ok(())
+    }
+}
+
+impl Surface {
+    pub fn check_writable(&self) -> ValidationResult {
+        for num in self.half_space.iter().flatten() {
+            check_writable_f64(*num)?;
+        }
+        check_writable_texture(&self.texture)?;
+        self.alignment.check_writable()
     }
 }
 
