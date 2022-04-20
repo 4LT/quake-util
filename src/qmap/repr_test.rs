@@ -290,6 +290,13 @@ mod write {
         assert!(String::from_utf8(dest).unwrap().contains("worldspawn"));
     }
 
+    #[test]
+    fn write_simple_entity() {
+        let mut dest: Vec<u8> = vec![];
+        assert!(simple_brush_entity().write_to(&mut dest).is_ok());
+        assert!(String::from_utf8(dest).unwrap().contains("worldspawn"));
+    }
+
     // Failure
 
     #[test]
@@ -305,99 +312,6 @@ mod write {
         let res = bad_entity_edict().write_to(&mut sink());
         if let Err(e) = res {
             assert!(format!("{:?}", e).contains("\\n"));
-        } else {
-            panic_expected_error();
-        }
-    }
-
-    #[test]
-    fn write_bad_surface_texture() {
-        let res = bad_surface_texture().write_to(&mut sink());
-        if let Err(e) = res {
-            assert!(format!("{:?}", e).contains("\\\""));
-        } else {
-            panic_expected_error();
-        }
-    }
-
-    #[test]
-    fn write_bad_surface_half_space() {
-        let surf = Surface {
-            half_space: BAD_HALF_SPACE,
-            texture: CString::new("butts").unwrap(),
-            alignment: GOOD_ALIGNMENT,
-        };
-
-        let res = surf.write_to(&mut sink());
-        if let Err(e) = res {
-            assert!(format!("{:?}", e).contains("finite"));
-        } else {
-            panic_expected_error();
-        }
-    }
-
-    #[test]
-    fn write_bad_alignment_offset() {
-        let aln = Alignment::Standard(BaseAlignment {
-            offset: BAD_VEC2,
-            rotation: 0.0,
-            scale: GOOD_VEC2,
-        });
-
-        let res = aln.write_to(&mut sink());
-        if let Err(e) = res {
-            assert!(format!("{:?}", e).contains("finite"));
-        } else {
-            panic_expected_error();
-        }
-    }
-
-    #[test]
-    fn write_bad_alignment_rotation() {
-        let aln = Alignment::Standard(BaseAlignment {
-            offset: GOOD_VEC2,
-            rotation: f64::NAN,
-            scale: GOOD_VEC2,
-        });
-
-        let res = aln.write_to(&mut sink());
-        if let Err(e) = res {
-            assert!(format!("{:?}", e).contains("finite"));
-        } else {
-            panic_expected_error();
-        }
-    }
-
-    #[test]
-    fn write_bad_alignment_scale() {
-        let aln = Alignment::Standard(BaseAlignment {
-            offset: GOOD_VEC2,
-            rotation: 0.7,
-            scale: BAD_VEC2,
-        });
-
-        let res = aln.write_to(&mut sink());
-        if let Err(e) = res {
-            assert!(format!("{:?}", e).contains("finite"));
-        } else {
-            panic_expected_error();
-        }
-    }
-
-    #[test]
-    fn write_bad_alignment_axes() {
-        let aln = Alignment::Valve220(
-            BaseAlignment {
-                offset: GOOD_VEC2,
-                rotation: -0.37,
-                scale: GOOD_VEC2,
-            },
-            BAD_AXES,
-        );
-
-        let res = aln.write_to(&mut sink());
-        if let Err(e) = res {
-            assert!(format!("{:?}", e).contains("finite"));
         } else {
             panic_expected_error();
         }
