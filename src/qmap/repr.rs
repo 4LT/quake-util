@@ -23,6 +23,7 @@ pub type Vec2 = [f64; 2];
 pub type ValidationResult = Result<(), String>;
 
 #[cfg(feature = "std")]
+#[derive(Debug)]
 pub enum WriteError {
     Validation(String),
     Io(io::Error),
@@ -247,7 +248,7 @@ impl Alignment {
     }
 
     #[cfg(feature = "std")]
-    fn check_writable(&self) -> ValidationResult {
+    pub fn check_writable(&self) -> ValidationResult {
         match self {
             Alignment::Standard(base) => base.check_writable(),
             Alignment::Valve220(base, axes) => {
@@ -310,7 +311,7 @@ pub struct BaseAlignment {
 }
 
 impl BaseAlignment {
-    fn check_writable(&self) -> ValidationResult {
+    pub fn check_writable(&self) -> ValidationResult {
         check_writable_array(self.offset)?;
         check_writable_f64(self.rotation)?;
         check_writable_array(self.scale)?;

@@ -1,4 +1,8 @@
+extern crate alloc;
+
 use crate::qmap::repr::*;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 #[cfg(feature = "std")]
 use std::ffi::CString;
@@ -266,6 +270,9 @@ fn check_bad_base_scale() {
 
 #[cfg(feature = "std")]
 mod write {
+    use super::*;
+    use std::io::sink;
+
     // Successes
 
     #[test]
