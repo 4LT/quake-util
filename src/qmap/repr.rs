@@ -21,7 +21,13 @@ use qmap::{CheckWritable, ValidationResult};
 use qmap::{WriteAttempt, WriteError};
 
 #[cfg(feature = "alloc_fills")]
-use {alloc::vec::Vec, cstr_core::CString, hashbrown::HashMap};
+use {
+    alloc::format,
+    alloc::string::String,
+    alloc::vec::Vec,
+    cstr_core::{CStr, CString},
+    hashbrown::HashMap,
+};
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];

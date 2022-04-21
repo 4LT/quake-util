@@ -1,21 +1,19 @@
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(feature = "no_fills")]
 extern crate alloc;
 
 use crate::qmap;
 use qmap::repr::*;
 
-#[cfg(feature = "std")]
-use qmap::WriteError;
-
 use qmap::{CheckWritable, ValidationResult};
 
-use alloc::string::String;
-use alloc::vec::Vec;
-
 #[cfg(feature = "std")]
-use std::ffi::CString;
+use {qmap::WriteError, std::ffi::CString, std::string::String, std::vec::Vec};
 
 #[cfg(feature = "alloc_fills")]
-use cstr_core::CString;
+use {alloc::format, alloc::vec, cstr_core::CString};
 
 const GOOD_AXES: [Vec3; 2] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
 
