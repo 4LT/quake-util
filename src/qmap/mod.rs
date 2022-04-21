@@ -7,7 +7,7 @@ mod lexer;
 pub mod parser;
 
 #[cfg(feature = "std")]
-pub mod result;
+pub mod parse_result;
 
 pub use repr::{
     Alignment, BaseAlignment, Brush, CheckWritable, Edict, Entity, HalfSpace,
@@ -18,7 +18,7 @@ pub use repr::{
 pub use parser::parse;
 
 #[cfg(feature = "std")]
-pub use result::{Error, LineError, Result};
+pub use parse_result::{LineError, ParseError, ParseResult};
 
 // test suites
 

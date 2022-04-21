@@ -1,5 +1,6 @@
 use crate::qmap;
 use qmap::lexer::{Token, TokenIterator};
+use qmap::ParseError;
 use std::io;
 use std::num::NonZeroU8;
 use std::vec::Vec;
@@ -58,7 +59,7 @@ fn lex_bad_quoted() {
     let bad_token = TokenIterator::new(&input[..]).skip(1).next();
 
     if let Err(qmap_error) = bad_token.unwrap() {
-        if let qmap::result::Error::Lexer(line_error) = qmap_error {
+        if let ParseError::Lexer(line_error) = qmap_error {
             assert!(line_error.message.contains("closing quote"));
             assert_eq!(u64::from(line_error.line_number.unwrap()), 1u64);
         } else {
@@ -75,7 +76,7 @@ fn lex_io_error() {
     let bad_token = TokenIterator::new(reader).next();
 
     if let Err(qmap_error) = bad_token.unwrap() {
-        if let qmap::result::Error::Io(io_error) = qmap_error {
+        if let ParseError::Io(io_error) = qmap_error {
             assert!(io_error.contains("Generic test error"));
         } else {
             panic!("Unexpected error type");

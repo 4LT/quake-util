@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::qmap;
-use crate::qmap::Result;
+use qmap::{ParseError, ParseResult};
 
 const TEXT_CAPACITY: usize = 32;
 
@@ -67,11 +67,11 @@ impl<R: io::Read> TokenIterator<R> {
         }
     }
 
-    fn byte_read(&mut self, b: io::Result<u8>) -> Result<Option<Token>> {
-        let byte = b.map_err(qmap::Error::from_io)?;
+    fn byte_read(&mut self, b: io::Result<u8>) -> ParseResult<Option<Token>> {
+        let byte = b.map_err(ParseError::from_io)?;
 
         self.byte = Some(byte.try_into().map_err(|_| {
-            qmap::Error::from_lexer(String::from("Null byte"), self.line_number)
+            ParseError::from_lexer(String::from("Null byte"), self.line_number)
         })?);
 
         let maybe_token = (self.state)(self);
@@ -90,13 +90,13 @@ impl<R: io::Read> TokenIterator<R> {
         Ok(maybe_token)
     }
 
-    fn eof_read(&mut self) -> Result<Option<Token>> {
+    fn eof_read(&mut self) -> ParseResult<Option<Token>> {
         if let Some(last_text) = self.text.replace(None) {
             if last_text[0] == NonZeroU8::new(b'"').unwrap()
                 && (last_text.last() != NonZeroU8::new(b'"').as_ref()
                     || last_text.len() == 1)
             {
-                Err(qmap::Error::from_lexer(
+                Err(ParseError::from_lexer(
                     String::from("Missing closing quote"),
                     self.line_number,
                 ))
@@ -113,9 +113,9 @@ impl<R: io::Read> TokenIterator<R> {
 }
 
 impl<R: io::Read> Iterator for TokenIterator<R> {
-    type Item = Result<Token>;
+    type Item = ParseResult<Token>;
 
-    fn next(&mut self) -> Option<Result<Token>> {
+    fn next(&mut self) -> Option<ParseResult<Token>> {
         loop {
             if let Some(b) = self.input.next() {
                 if let token @ Some(_) = self.byte_read(b).transpose() {
