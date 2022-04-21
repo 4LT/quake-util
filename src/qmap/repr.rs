@@ -19,8 +19,11 @@ use {alloc::vec::Vec, cstr_core::CString, hashbrown::HashMap};
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
-
 pub type ValidationResult = Result<(), String>;
+
+pub trait CheckWritable {
+    fn check_writable(&self) -> ValidationResult;
+}
 
 #[cfg(feature = "std")]
 #[derive(Debug)]
@@ -32,24 +35,9 @@ pub enum WriteError {
 #[cfg(feature = "std")]
 pub type WriteAttempt = Result<(), WriteError>;
 
-#[cfg(feature = "std")]
-pub trait Writes<W: io::Write> {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt;
-}
-
 #[derive(Clone)]
 pub struct QuakeMap {
     pub entities: Vec<Entity>,
-}
-
-#[cfg(feature = "std")]
-impl<W: io::Write> Writes<W> for QuakeMap {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt {
-        for ent in &self.entities {
-            ent.write_to(writer)?;
-        }
-        Ok(())
-    }
 }
 
 impl QuakeMap {
@@ -59,7 +47,17 @@ impl QuakeMap {
         }
     }
 
-    pub fn check_writable(&self) -> ValidationResult {
+    #[cfg(feature = "std")]
+    pub fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
+        for ent in &self.entities {
+            ent.write_to(writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl CheckWritable for QuakeMap {
+    fn check_writable(&self) -> ValidationResult {
         for ent in &self.entities {
             ent.check_writable()?;
         }
@@ -88,27 +86,22 @@ impl Entity {
             Self::Brush(ref mut edict, _) => edict,
         }
     }
-}
 
-#[cfg(feature = "std")]
-impl<W: io::Write> Writes<W> for Entity {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt {
-        for (k, v) in self.edict() {
-            check_writable_quoted(k).map_err(WriteError::Validation)?;
-            check_writable_quoted(v).map_err(WriteError::Validation)?;
-        }
+    #[cfg(feature = "std")]
+    pub fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
+        self.check_writable().map_err(WriteError::Validation)?;
 
         writer.write_all(b"{\r\n").map_err(WriteError::Io)?;
 
         match self {
             Entity::Brush(edict, brushes) => {
-                edict.write_to(writer)?;
+                write_edict_to(edict, writer)?;
                 for brush in brushes {
-                    brush.write_to(writer)?;
+                    write_brush_to(brush, writer)?;
                 }
             }
             Entity::Point(edict) => {
-                edict.write_to(writer)?;
+                write_edict_to(edict, writer)?;
             }
         }
 
@@ -117,16 +110,13 @@ impl<W: io::Write> Writes<W> for Entity {
     }
 }
 
-impl Entity {
-    pub fn check_writable(&self) -> ValidationResult {
-        for (k, v) in self.edict() {
-            check_writable_quoted(k)?;
-            check_writable_quoted(v)?;
-        }
+impl CheckWritable for Entity {
+    fn check_writable(&self) -> ValidationResult {
+        self.edict().check_writable()?;
 
         if let Entity::Brush(_, brushes) = self {
-            for surface in brushes.iter().flatten() {
-                surface.check_writable()?;
+            for brush in brushes {
+                brush.check_writable()?
             }
         }
 
@@ -136,33 +126,25 @@ impl Entity {
 
 pub type Edict = HashMap<CString, CString>;
 
-#[cfg(feature = "std")]
-impl<W: io::Write> Writes<W> for Edict {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt {
-        for (key, value) in self {
-            writer.write_all(b"\"").map_err(WriteError::Io)?;
-            writer.write_all(key.as_bytes()).map_err(WriteError::Io)?;
-            writer.write_all(b"\" \"").map_err(WriteError::Io)?;
-            writer.write_all(value.as_bytes()).map_err(WriteError::Io)?;
-            writer.write_all(b"\"\r\n").map_err(WriteError::Io)?;
+impl CheckWritable for Edict {
+    fn check_writable(&self) -> ValidationResult {
+        for (k, v) in self {
+            check_writable_quoted(k)?;
+            check_writable_quoted(v)?;
         }
+
         Ok(())
     }
 }
 
 pub type Brush = Vec<Surface>;
 
-#[cfg(feature = "std")]
-impl<W: io::Write> Writes<W> for Brush {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt {
-        writer.write_all(b"{\r\n").map_err(WriteError::Io)?;
-
-        for surf in self {
-            surf.write_to(writer)?;
-            writer.write_all(b"\r\n").map_err(WriteError::Io)?;
+impl CheckWritable for Brush {
+    fn check_writable(&self) -> ValidationResult {
+        for surface in self {
+            surface.check_writable()?;
         }
 
-        writer.write_all(b"}\r\n").map_err(WriteError::Io)?;
         Ok(())
     }
 }
@@ -174,16 +156,10 @@ pub struct Surface {
     pub alignment: Alignment,
 }
 
-#[cfg(feature = "std")]
-impl<W: io::Write> Writes<W> for Surface {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt {
-        for num in self.half_space.iter().flatten() {
-            check_writable_f64(*num).map_err(WriteError::Validation)?;
-        }
-        check_writable_texture(&self.texture)
-            .map_err(WriteError::Validation)?;
-
-        self.half_space.write_to(writer)?;
+impl Surface {
+    #[cfg(feature = "std")]
+    fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
+        write_half_space_to(&self.half_space, writer)?;
         writer.write_all(b" ").map_err(WriteError::Io)?;
         writer
             .write_all(self.texture.as_bytes())
@@ -194,11 +170,9 @@ impl<W: io::Write> Writes<W> for Surface {
     }
 }
 
-impl Surface {
-    pub fn check_writable(&self) -> ValidationResult {
-        for num in self.half_space.iter().flatten() {
-            check_writable_f64(*num)?;
-        }
+impl CheckWritable for Surface {
+    fn check_writable(&self) -> ValidationResult {
+        self.half_space.check_writable()?;
         check_writable_texture(&self.texture)?;
         self.alignment.check_writable()
     }
@@ -206,22 +180,12 @@ impl Surface {
 
 pub type HalfSpace = [Point; 3];
 
-#[cfg(feature = "std")]
-impl<W: io::Write> Writes<W> for HalfSpace {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt {
-        for (index, pt) in self.iter().enumerate() {
-            writer.write_all(b"( ").map_err(WriteError::Io)?;
-
-            for element in pt.iter() {
-                write!(writer, "{} ", element).map_err(WriteError::Io)?;
-            }
-
-            writer.write_all(b")").map_err(WriteError::Io)?;
-
-            if index != 2 {
-                writer.write_all(b" ").map_err(WriteError::Io)?;
-            }
+impl CheckWritable for HalfSpace {
+    fn check_writable(&self) -> ValidationResult {
+        for num in self.iter().flatten() {
+            check_writable_f64(*num)?;
         }
+
         Ok(())
     }
 }
@@ -248,25 +212,7 @@ impl Alignment {
     }
 
     #[cfg(feature = "std")]
-    pub fn check_writable(&self) -> ValidationResult {
-        match self {
-            Alignment::Standard(base) => base.check_writable(),
-            Alignment::Valve220(base, axes) => {
-                base.check_writable()?;
-                for axis in axes {
-                    check_writable_array(*axis)?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<W: io::Write> Writes<W> for Alignment {
-    fn write_to(&self, writer: &mut W) -> WriteAttempt {
-        self.check_writable().map_err(WriteError::Validation)?;
-
+    fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
         match self {
             Alignment::Standard(base) => {
                 write!(
@@ -303,6 +249,23 @@ impl<W: io::Write> Writes<W> for Alignment {
     }
 }
 
+impl CheckWritable for Alignment {
+    fn check_writable(&self) -> ValidationResult {
+        match self {
+            Alignment::Standard(base) => base.check_writable(),
+            Alignment::Valve220(base, axes) => {
+                base.check_writable()?;
+
+                for axis in axes {
+                    check_writable_array(*axis)?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct BaseAlignment {
     pub offset: Vec2,
@@ -310,13 +273,59 @@ pub struct BaseAlignment {
     pub scale: Vec2,
 }
 
-impl BaseAlignment {
-    pub fn check_writable(&self) -> ValidationResult {
+impl CheckWritable for BaseAlignment {
+    fn check_writable(&self) -> ValidationResult {
         check_writable_array(self.offset)?;
         check_writable_f64(self.rotation)?;
         check_writable_array(self.scale)?;
         Ok(())
     }
+}
+
+#[cfg(feature = "std")]
+fn write_edict_to<W: io::Write>(edict: &Edict, writer: &mut W) -> WriteAttempt {
+    for (key, value) in edict {
+        writer.write_all(b"\"").map_err(WriteError::Io)?;
+        writer.write_all(key.as_bytes()).map_err(WriteError::Io)?;
+        writer.write_all(b"\" \"").map_err(WriteError::Io)?;
+        writer.write_all(value.as_bytes()).map_err(WriteError::Io)?;
+        writer.write_all(b"\"\r\n").map_err(WriteError::Io)?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "std")]
+fn write_brush_to<W: io::Write>(brush: &Brush, writer: &mut W) -> WriteAttempt {
+    writer.write_all(b"{\r\n").map_err(WriteError::Io)?;
+
+    for surf in brush {
+        surf.write_to(writer)?;
+        writer.write_all(b"\r\n").map_err(WriteError::Io)?;
+    }
+
+    writer.write_all(b"}\r\n").map_err(WriteError::Io)?;
+    Ok(())
+}
+
+#[cfg(feature = "std")]
+fn write_half_space_to<W: io::Write>(
+    half_space: &HalfSpace,
+    writer: &mut W,
+) -> WriteAttempt {
+    for (index, pt) in half_space.iter().enumerate() {
+        writer.write_all(b"( ").map_err(WriteError::Io)?;
+
+        for element in pt.iter() {
+            write!(writer, "{} ", element).map_err(WriteError::Io)?;
+        }
+
+        writer.write_all(b")").map_err(WriteError::Io)?;
+
+        if index != 2 {
+            writer.write_all(b" ").map_err(WriteError::Io)?;
+        }
+    }
+    Ok(())
 }
 
 fn check_writable_array<const N: usize>(arr: [f64; N]) -> ValidationResult {

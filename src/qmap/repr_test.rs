@@ -316,4 +316,32 @@ mod write {
             panic_expected_error();
         }
     }
+
+    #[test]
+    fn write_validation_error_outputs_nothing() {
+        let mut dest: Vec<u8> = vec![];
+        let mut qmap = QuakeMap::new();
+        qmap.entities.push(Entity::Brush(
+            simple_edict(),
+            vec![vec![Surface {
+                half_space: GOOD_HALF_SPACE,
+                texture: CString::new("b\"").unwrap(),
+                alignment: Alignment::Valve220(
+                    BaseAlignment {
+                        offset: GOOD_VEC2,
+                        rotation: 0.0,
+                        scale: BAD_VEC2,
+                    },
+                    GOOD_AXES,
+                ),
+            }]],
+        ));
+        let res = qmap.write_to(&mut dest);
+
+        if let Err(WriteError::Validation(_)) = res {
+            assert_eq!(String::from_utf8(dest).unwrap(), String::from(""));
+        } else {
+            panic_expected_error();
+        }
+    }
 }

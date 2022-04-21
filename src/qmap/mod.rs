@@ -10,12 +10,9 @@ pub mod parser;
 pub mod result;
 
 pub use repr::{
-    Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
-    Surface, Vec2, Vec3,
+    Alignment, BaseAlignment, Brush, CheckWritable, Edict, Entity, HalfSpace,
+    Point, QuakeMap, Surface, Vec2, Vec3,
 };
-
-#[cfg(feature = "std")]
-pub use repr::Writes;
 
 #[cfg(feature = "std")]
 pub use parser::parse;
