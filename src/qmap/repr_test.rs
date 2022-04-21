@@ -1,6 +1,13 @@
 extern crate alloc;
 
-use crate::qmap::repr::*;
+use crate::qmap;
+use qmap::repr::*;
+
+#[cfg(feature = "std")]
+use qmap::WriteError;
+
+use qmap::{CheckWritable, ValidationResult};
+
 use alloc::string::String;
 use alloc::vec::Vec;
 

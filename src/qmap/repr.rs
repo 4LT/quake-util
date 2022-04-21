@@ -4,6 +4,8 @@ extern crate std;
 #[cfg(feature = "alloc_fills")]
 extern crate alloc;
 
+use crate::qmap;
+
 #[cfg(feature = "std")]
 use std::{
     collections::HashMap,
@@ -13,27 +15,17 @@ use std::{
     vec::Vec,
 };
 
+use qmap::{CheckWritable, ValidationResult};
+
+#[cfg(feature = "std")]
+use qmap::{WriteAttempt, WriteError};
+
 #[cfg(feature = "alloc_fills")]
 use {alloc::vec::Vec, cstr_core::CString, hashbrown::HashMap};
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
-pub type ValidationResult = Result<(), String>;
-
-pub trait CheckWritable {
-    fn check_writable(&self) -> ValidationResult;
-}
-
-#[cfg(feature = "std")]
-#[derive(Debug)]
-pub enum WriteError {
-    Validation(String),
-    Io(io::Error),
-}
-
-#[cfg(feature = "std")]
-pub type WriteAttempt = Result<(), WriteError>;
 
 #[derive(Clone)]
 pub struct QuakeMap {
