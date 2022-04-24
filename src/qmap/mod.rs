@@ -9,11 +9,9 @@ pub mod parser;
 #[cfg(feature = "std")]
 pub mod parse_result;
 
-pub mod repr_write;
-
 pub use repr::{
-    Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
-    Surface, Vec2, Vec3,
+    Alignment, BaseAlignment, Brush, CheckWritable, Edict, Entity, HalfSpace,
+    Point, QuakeMap, Surface, ValidationResult, Vec2, Vec3,
 };
 
 #[cfg(feature = "std")]
@@ -22,10 +20,8 @@ pub use parser::parse;
 #[cfg(feature = "std")]
 pub use parse_result::{LineError, ParseError, ParseResult};
 
-pub use repr_write::{CheckWritable, ValidationResult};
-
 #[cfg(feature = "std")]
-pub use repr_write::{WriteAttempt, WriteError};
+pub use repr::{WriteAttempt, WriteError};
 
 // test suites
 

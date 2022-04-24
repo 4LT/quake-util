@@ -4,8 +4,6 @@ extern crate std;
 #[cfg(feature = "alloc_fills")]
 extern crate alloc;
 
-use crate::qmap;
-
 #[cfg(feature = "std")]
 use std::{
     collections::HashMap,
@@ -15,11 +13,6 @@ use std::{
     vec::Vec,
 };
 
-use qmap::{CheckWritable, ValidationResult};
-
-#[cfg(feature = "std")]
-use qmap::{WriteAttempt, WriteError};
-
 #[cfg(feature = "alloc_fills")]
 use {
     alloc::format,
@@ -28,6 +21,22 @@ use {
     cstr_core::{CStr, CString},
     hashbrown::HashMap,
 };
+
+pub type ValidationResult = Result<(), String>;
+
+pub trait CheckWritable {
+    fn check_writable(&self) -> ValidationResult;
+}
+
+#[cfg(feature = "std")]
+#[derive(Debug)]
+pub enum WriteError {
+    Validation(String),
+    Io(std::io::Error),
+}
+
+#[cfg(feature = "std")]
+pub type WriteAttempt = Result<(), WriteError>;
 
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
