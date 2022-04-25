@@ -168,9 +168,7 @@ impl Surface {
     fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
         write_half_space_to(&self.half_space, writer)?;
         writer.write_all(b" ").map_err(WriteError::Io)?;
-        writer
-            .write_all(self.texture.as_bytes())
-            .map_err(WriteError::Io)?;
+        write_texture_to(&self.texture, writer)?;
         writer.write_all(b" ").map_err(WriteError::Io)?;
         self.alignment.write_to(writer)?;
         Ok(())
@@ -332,6 +330,30 @@ fn write_half_space_to<W: io::Write>(
             writer.write_all(b" ").map_err(WriteError::Io)?;
         }
     }
+    Ok(())
+}
+
+#[cfg(feature = "std")]
+fn write_texture_to<W: io::Write>(
+    texture: &CStr,
+    writer: &mut W,
+) -> WriteAttempt {
+    let needs_quotes =
+        texture.to_bytes().iter().any(|c| c.is_ascii_whitespace())
+            || texture.to_bytes().is_empty();
+
+    if needs_quotes {
+        writer.write_all(b"\"").map_err(WriteError::Io)?;
+    }
+
+    writer
+        .write_all(texture.to_bytes())
+        .map_err(WriteError::Io)?;
+
+    if needs_quotes {
+        writer.write_all(b"\"").map_err(WriteError::Io)?;
+    }
+
     Ok(())
 }
 

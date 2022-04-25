@@ -10,10 +10,21 @@ use qmap::repr::*;
 use qmap::{CheckWritable, ValidationResult};
 
 #[cfg(feature = "std")]
-use {qmap::WriteError, std::ffi::CString, std::string::String, std::vec::Vec};
+use {
+    qmap::WriteError,
+    std::ffi::{CStr, CString},
+    std::str,
+    std::string::String,
+    std::vec::Vec,
+};
 
 #[cfg(feature = "alloc_fills")]
-use {alloc::format, alloc::vec, cstr_core::CString};
+use {
+    alloc::format,
+    alloc::str,
+    alloc::vec,
+    cstr_core::{CStr, CString},
+};
 
 const GOOD_AXES: [Vec3; 2] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
 
@@ -82,14 +93,6 @@ fn simple_surface() -> Surface {
     }
 }
 
-fn bad_surface_texture() -> Surface {
-    Surface {
-        half_space: GOOD_HALF_SPACE,
-        texture: CString::new("\"").unwrap(),
-        alignment: GOOD_ALIGNMENT,
-    }
-}
-
 fn simple_brush() -> Brush {
     vec![
         simple_surface(),
@@ -109,6 +112,17 @@ fn simple_point_entity() -> Entity {
 
 fn bad_entity_edict() -> Entity {
     Entity::Brush(bad_edict_key(), vec![simple_brush()])
+}
+
+fn entity_with_texture(texture: &CStr) -> Entity {
+    Entity::Brush(
+        Edict::new(),
+        vec![vec![Surface {
+            half_space: GOOD_HALF_SPACE,
+            texture: CString::from(texture),
+            alignment: GOOD_ALIGNMENT,
+        }]],
+    )
 }
 
 fn simple_map() -> QuakeMap {
@@ -196,7 +210,10 @@ fn check_bad_entities() {
 
 #[test]
 fn check_bad_surface_texture() {
-    assert!(matches!(bad_surface_texture().check_writable(), Err(_)));
+    assert!(matches!(
+        entity_with_texture(&CString::new("\"").unwrap()).check_writable(),
+        Err(_)
+    ));
 }
 
 #[test]
@@ -283,23 +300,49 @@ mod write {
     #[test]
     fn write_empty_map() {
         let map = QuakeMap::new();
-        let mut dest: Vec<u8> = vec![];
+        let mut dest = Vec::<u8>::new();
         assert!(map.write_to(&mut dest).is_ok());
         assert_eq!(&dest[..], b"");
     }
 
     #[test]
     fn write_simple_map() {
-        let mut dest: Vec<u8> = vec![];
+        let mut dest = Vec::<u8>::new();
         assert!(simple_map().write_to(&mut dest).is_ok());
-        assert!(String::from_utf8(dest).unwrap().contains("worldspawn"));
+        assert!(str::from_utf8(&dest).unwrap().contains("worldspawn"));
+        assert!(str::from_utf8(&dest).unwrap().contains(" {FENCE "));
     }
 
     #[test]
     fn write_simple_entity() {
-        let mut dest: Vec<u8> = vec![];
+        let mut dest = Vec::<u8>::new();
         assert!(simple_brush_entity().write_to(&mut dest).is_ok());
-        assert!(String::from_utf8(dest).unwrap().contains("worldspawn"));
+        assert!(str::from_utf8(&dest).unwrap().contains("worldspawn"));
+        assert!(str::from_utf8(&dest).unwrap().contains(" {FENCE "));
+    }
+
+    #[test]
+    fn write_entity_with_spaced_texture() {
+        let ent = entity_with_texture(&CString::new("some texture").unwrap());
+        let mut dest = Vec::<u8>::new();
+        assert!(ent.write_to(&mut dest).is_ok());
+        assert!(str::from_utf8(&dest).unwrap().contains("\"some texture\""));
+    }
+
+    #[test]
+    fn write_texture_with_quote() {
+        let ent = entity_with_texture(&CString::new("some\"texture").unwrap());
+        let mut dest = Vec::<u8>::new();
+        assert!(ent.write_to(&mut dest).is_ok());
+        assert!(str::from_utf8(&dest).unwrap().contains(" some\"texture "));
+    }
+
+    #[test]
+    fn write_bad_texture_empty() {
+        let ent = entity_with_texture(&CString::new("").unwrap());
+        let mut dest = Vec::<u8>::new();
+        assert!(ent.write_to(&mut dest).is_ok());
+        assert!(str::from_utf8(&dest).unwrap().contains("\"\""));
     }
 
     // Failure
@@ -320,6 +363,21 @@ mod write {
         } else {
             panic_expected_error();
         }
+    }
+
+    #[test]
+    fn write_bad_texture_spaced_with_quote() {
+        let ent = entity_with_texture(&CString::new("some\" texture").unwrap());
+        let err = ent.write_to(&mut sink()).unwrap_err();
+        assert!(format!("{:?}", err).contains("whitespace"));
+    }
+
+    #[test]
+    fn write_bad_texture_leads_quote() {
+        let ent = entity_with_texture(&CString::new("\"some").unwrap());
+        let err = ent.write_to(&mut sink()).unwrap_err();
+        assert!(format!("{:?}", err)
+            .contains("not quotable and contains whitespace"));
     }
 
     #[test]
