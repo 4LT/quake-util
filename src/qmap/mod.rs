@@ -7,21 +7,21 @@ mod lexer;
 pub mod parser;
 
 #[cfg(feature = "std")]
-pub mod result;
+pub mod parse_result;
 
 pub use repr::{
-    Alignment, BaseAlignment, Brush, Edict, Entity, HalfSpace, Point, QuakeMap,
-    Surface, Vec2, Vec3,
+    Alignment, BaseAlignment, Brush, CheckWritable, Edict, Entity, HalfSpace,
+    Point, QuakeMap, Surface, ValidationResult, Vec2, Vec3,
 };
-
-#[cfg(feature = "std")]
-pub use repr::Writes;
 
 #[cfg(feature = "std")]
 pub use parser::parse;
 
 #[cfg(feature = "std")]
-pub use result::{Error, LineError, Result};
+pub use parse_result::{LineError, ParseError, ParseResult};
+
+#[cfg(feature = "std")]
+pub use repr::{WriteAttempt, WriteError};
 
 // test suites
 
