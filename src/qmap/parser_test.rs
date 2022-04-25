@@ -201,20 +201,20 @@ fn parse_weird_numbers() {
 fn parse_weird_textures() {
     let map = parse(
         &br#"
-        { {
-            ( 1 2 3 ) ( 4 5 6 ) ( 7 8 9 )
-            {FENCE
-            0 0 0 1 1
+            { {
+                ( 1 2 3 ) ( 4 5 6 ) ( 7 8 9 )
+                {FENCE
+                0 0 0 1 1
 
-            ( 9 8 7 ) ( 6 5 4 ) ( 9 8 7 )
-            "spaced out"
-            0 0 0 1 1
+                ( 9 8 7 ) ( 6 5 4 ) ( 9 8 7 )
+                "spaced out"
+                0 0 0 1 1
 
-            ( 11 12 13 ) ( 23 24 25 ) ( 35 36 37 )
-            silly"example
-            0 0 0 1 1
-        } }
-    "#[..],
+                ( 11 12 13 ) ( 23 24 25 ) ( 35 36 37 )
+                silly"example
+                0 0 0 1 1
+            } }
+        "#[..],
     )
     .unwrap();
 
@@ -280,6 +280,21 @@ fn parse_missing_value() {
     if let ParseError::Parser(line_err) = err {
         assert_eq!(u64::from(line_err.line_number.unwrap()), 3u64);
         assert!(line_err.message.contains("}"));
+    } else {
+        panic_unexpected_variant(err);
+    }
+}
+
+#[test]
+fn parse_bad_texture_name() {
+    let map_text = br#"
+            { {
+                ( 1 2 3 ) ( 2 3 1 ) ( 3 1 2 ) "bad"tex" 0 0 0 1 1
+            } }
+        "#;
+    let err = parse(&map_text[..]).err().unwrap();
+    if let ParseError::Parser(line_err) = err {
+        assert!(line_err.message.contains("tex\""));
     } else {
         panic_unexpected_variant(err);
     }
