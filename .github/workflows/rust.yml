@@ -19,6 +19,7 @@ jobs:
         feature-set: ['', '--no-default-features --features alloc_fills']
 
     steps:
+    - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
