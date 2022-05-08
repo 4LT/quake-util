@@ -1,0 +1,32 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Run checks and tests with various feature sets
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        feature-set: ['', '--no-default-features --features alloc_fills']
+
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+        components: clippy
+    - name: Check
+      run: cargo check ${{ matrix.feature-set }}
+    - name: Lint
+      run: cargo clippy ${{ matrix.feature-set }}
+    - name: Test
+      run: cargo test ${{ matrix.feature-set }}
