@@ -11,7 +11,7 @@ env:
 
 jobs:
   test:
-    name: Run checks and tests with various feature sets
+    name: Checks and tests with ${{ matrix.feature-set }}
     runs-on: ubuntu-latest
 
     strategy:
