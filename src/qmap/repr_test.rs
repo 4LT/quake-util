@@ -1,9 +1,6 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "no_fills")]
-extern crate alloc;
-
 use crate::qmap;
 use qmap::repr::*;
 
@@ -20,10 +17,11 @@ use {
 
 #[cfg(feature = "alloc_fills")]
 use {
+    alloc::ffi::CString,
+    core::ffi::CStr,
     alloc::format,
-    alloc::str,
     alloc::vec,
-    cstr_core::{CStr, CString},
+    alloc::str,
 };
 
 const GOOD_AXES: [Vec3; 2] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];

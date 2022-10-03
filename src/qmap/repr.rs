@@ -15,11 +15,8 @@ use std::{
 
 #[cfg(feature = "alloc_fills")]
 use {
-    alloc::format,
-    alloc::string::String,
-    alloc::vec::Vec,
-    cstr_core::{CStr, CString},
-    hashbrown::HashMap,
+    alloc::ffi::CString, alloc::format, alloc::string::String, alloc::vec::Vec,
+    core::ffi::CStr, hashbrown::HashMap,
 };
 
 pub type ValidationResult = Result<(), String>;
