@@ -3,7 +3,8 @@ name = "quake-util"
 version = "0.1.0"
 authors = ["Seth <rader.seth@gmail.com>"]
 edition = "2021"
-license = "CC0-1.0 OR MIT"
+description = "A utility library for using Quake file formats"
+license = "CC0-1.0 OR MIT OR Apache-2.0"
 
 [features]
 default = ["std"]
