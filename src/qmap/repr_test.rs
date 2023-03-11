@@ -17,11 +17,7 @@ use {
 
 #[cfg(feature = "alloc_fills")]
 use {
-    alloc::ffi::CString,
-    core::ffi::CStr,
-    alloc::format,
-    alloc::vec,
-    alloc::str,
+    alloc::ffi::CString, alloc::format, alloc::str, alloc::vec, core::ffi::CStr,
 };
 
 const GOOD_AXES: [Vec3; 2] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
@@ -38,23 +34,19 @@ const GOOD_HALF_SPACE: [Point; 3] =
 const BAD_HALF_SPACE: [Point; 3] =
     [[f64::NAN, -1.0, 0.0], [1.0, -1.0, 0.0], [-1.0, 1.0, 0.0]];
 
-const GOOD_ALIGNMENT: Alignment = Alignment::Valve220(
-    BaseAlignment {
-        offset: GOOD_VEC2,
-        rotation: 0.0,
-        scale: GOOD_VEC2,
-    },
-    GOOD_AXES,
-);
+const GOOD_ALIGNMENT: Alignment = Alignment {
+    offset: GOOD_VEC2,
+    rotation: 0.0,
+    scale: GOOD_VEC2,
+    axes: Some(GOOD_AXES),
+};
 
-const BAD_ALIGNMENT_ROTATION: Alignment = Alignment::Valve220(
-    BaseAlignment {
-        offset: GOOD_VEC2,
-        rotation: f64::NAN,
-        scale: GOOD_VEC2,
-    },
-    GOOD_AXES,
-);
+const BAD_ALIGNMENT_ROTATION: Alignment = Alignment {
+    offset: GOOD_VEC2,
+    rotation: f64::NAN,
+    scale: GOOD_VEC2,
+    axes: Some(GOOD_AXES),
+};
 
 fn expect_err_containing(res: ValidationResult, text: &str) {
     if let Err(e) = res {
@@ -101,26 +93,35 @@ fn simple_brush() -> Brush {
 }
 
 fn simple_brush_entity() -> Entity {
-    Entity::Brush(simple_edict(), vec![simple_brush()])
+    Entity {
+        edict: simple_edict(),
+        brushes: vec![simple_brush()],
+    }
 }
 
 fn simple_point_entity() -> Entity {
-    Entity::Point(simple_edict())
+    Entity {
+        edict: simple_edict(),
+        brushes: vec![],
+    }
 }
 
 fn bad_entity_edict() -> Entity {
-    Entity::Brush(bad_edict_key(), vec![simple_brush()])
+    Entity {
+        edict: bad_edict_key(),
+        brushes: vec![simple_brush()],
+    }
 }
 
 fn entity_with_texture(texture: &CStr) -> Entity {
-    Entity::Brush(
-        Edict::new(),
-        vec![vec![Surface {
+    Entity {
+        edict: Edict::new(),
+        brushes: vec![vec![Surface {
             half_space: GOOD_HALF_SPACE,
             texture: CString::from(texture),
             alignment: GOOD_ALIGNMENT,
         }]],
-    )
+    }
 }
 
 fn simple_map() -> QuakeMap {
@@ -138,30 +139,6 @@ fn bad_map_edict() -> QuakeMap {
 }
 
 // Successes
-
-#[test]
-fn mutable_edict() {
-    let mut ent = Entity::Point(Edict::new());
-    let key = CString::new("skin").unwrap();
-    let value = CString::new("value").unwrap();
-
-    ent.edict_mut().insert(key.clone(), value.clone());
-
-    assert_eq!(ent.edict().get(&key), Some(&value));
-}
-
-#[test]
-fn mutable_base_alignment() {
-    let mut alignment = Alignment::Standard(BaseAlignment {
-        offset: [0.0, 0.0],
-        rotation: 1.11,
-        scale: [1.0, 1.0],
-    });
-
-    alignment.base_mut().rotation = 12.0;
-
-    assert_eq!(alignment.base().rotation, 12.0);
-}
 
 #[test]
 fn check_simple_map() {
@@ -200,7 +177,10 @@ fn check_bad_entities() {
         let value = CString::new(value).unwrap();
         let mut edict = Edict::new();
         edict.insert(key, value);
-        let ent = Entity::Point(edict);
+        let ent = Entity {
+            edict,
+            brushes: vec![],
+        };
 
         expect_err_containing(ent.check_writable(), &format!("{:?}", bad_char));
     }
@@ -237,55 +217,56 @@ fn check_bad_surface_alignment() {
 }
 
 #[test]
-fn check_bad_valve_alignment_base() {
+fn check_bad_valve_alignment() {
     expect_err_containing(BAD_ALIGNMENT_ROTATION.check_writable(), "finite");
 }
 
 #[test]
 fn check_bad_valve_alignment_axes() {
-    let aln = Alignment::Valve220(
-        BaseAlignment {
-            offset: GOOD_VEC2,
-            rotation: 0.0,
-            scale: GOOD_VEC2,
-        },
-        BAD_AXES,
-    );
+    let aln = Alignment {
+        offset: GOOD_VEC2,
+        rotation: 0.0,
+        scale: GOOD_VEC2,
+        axes: Some(BAD_AXES),
+    };
 
     expect_err_containing(aln.check_writable(), "finite");
 }
 
 #[test]
-fn check_bad_base_alignment_rotation() {
-    let base = BaseAlignment {
+fn check_bad_alignment_rotation() {
+    let aln = Alignment {
         offset: GOOD_VEC2,
         rotation: f64::INFINITY,
         scale: GOOD_VEC2,
+        axes: None,
     };
 
-    expect_err_containing(base.check_writable(), "finite");
+    expect_err_containing(aln.check_writable(), "finite");
 }
 
 #[test]
-fn check_bad_base_rotation() {
-    let base = BaseAlignment {
+fn check_bad_alignment_offset() {
+    let aln = Alignment {
         offset: BAD_VEC2,
         rotation: 12345.7,
         scale: GOOD_VEC2,
+        axes: None,
     };
 
-    expect_err_containing(base.check_writable(), "finite");
+    expect_err_containing(aln.check_writable(), "finite");
 }
 
 #[test]
-fn check_bad_base_scale() {
-    let base = BaseAlignment {
+fn check_bad_alignment_scale() {
+    let aln = Alignment {
         offset: GOOD_VEC2,
         rotation: -125.7,
         scale: BAD_VEC2,
+        axes: None,
     };
 
-    expect_err_containing(base.check_writable(), "finite");
+    expect_err_containing(aln.check_writable(), "finite");
 }
 
 #[cfg(feature = "std")]
@@ -382,21 +363,19 @@ mod write {
     fn write_validation_error_outputs_nothing() {
         let mut dest: Vec<u8> = vec![];
         let mut qmap = QuakeMap::new();
-        qmap.entities.push(Entity::Brush(
-            simple_edict(),
-            vec![vec![Surface {
+        qmap.entities.push(Entity {
+            edict: simple_edict(),
+            brushes: vec![vec![Surface {
                 half_space: GOOD_HALF_SPACE,
                 texture: CString::new("b\"").unwrap(),
-                alignment: Alignment::Valve220(
-                    BaseAlignment {
-                        offset: GOOD_VEC2,
-                        rotation: 0.0,
-                        scale: BAD_VEC2,
-                    },
-                    GOOD_AXES,
-                ),
+                alignment: Alignment {
+                    offset: GOOD_VEC2,
+                    rotation: 0.0,
+                    scale: BAD_VEC2,
+                    axes: Some(GOOD_AXES),
+                },
             }]],
-        ));
+        });
         let res = qmap.write_to(&mut dest);
 
         if let Err(WriteError::Validation(_)) = res {

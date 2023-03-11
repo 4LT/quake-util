@@ -10,7 +10,7 @@ pub mod parser;
 pub mod parse_result;
 
 pub use repr::{
-    Alignment, BaseAlignment, Brush, CheckWritable, Edict, Entity, HalfSpace,
+    Alignment, Brush, CheckWritable, Edict, Entity, EntityKind, HalfSpace,
     Point, QuakeMap, Surface, ValidationResult, Vec2, Vec3,
 };
 

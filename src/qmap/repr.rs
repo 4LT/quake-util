@@ -70,24 +70,31 @@ impl CheckWritable for QuakeMap {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum EntityKind {
+    Point,
+    Brush,
+}
+
 #[derive(Clone)]
-pub enum Entity {
-    Brush(Edict, Vec<Brush>),
-    Point(Edict),
+pub struct Entity {
+    pub edict: Edict,
+    pub brushes: Vec<Brush>,
 }
 
 impl Entity {
-    pub fn edict(&self) -> &Edict {
-        match self {
-            Self::Point(edict) => edict,
-            Self::Brush(edict, _) => edict,
+    pub fn new() -> Self {
+        Entity {
+            edict: Edict::new(),
+            brushes: Vec::new(),
         }
     }
 
-    pub fn edict_mut(&mut self) -> &mut Edict {
-        match *self {
-            Self::Point(ref mut edict) => edict,
-            Self::Brush(ref mut edict, _) => edict,
+    pub fn kind(&self) -> EntityKind {
+        if self.brushes.is_empty() {
+            EntityKind::Point
+        } else {
+            EntityKind::Brush
         }
     }
 
@@ -97,16 +104,10 @@ impl Entity {
 
         writer.write_all(b"{\r\n").map_err(WriteError::Io)?;
 
-        match self {
-            Entity::Brush(edict, brushes) => {
-                write_edict_to(edict, writer)?;
-                for brush in brushes {
-                    write_brush_to(brush, writer)?;
-                }
-            }
-            Entity::Point(edict) => {
-                write_edict_to(edict, writer)?;
-            }
+        write_edict_to(&self.edict, writer)?;
+
+        for brush in &self.brushes {
+            write_brush_to(brush, writer)?;
         }
 
         writer.write_all(b"}\r\n").map_err(WriteError::Io)?;
@@ -114,14 +115,18 @@ impl Entity {
     }
 }
 
+impl Default for Entity {
+    fn default() -> Self {
+        Entity::new()
+    }
+}
+
 impl CheckWritable for Entity {
     fn check_writable(&self) -> ValidationResult {
-        self.edict().check_writable()?;
+        self.edict.check_writable()?;
 
-        if let Entity::Brush(_, brushes) = self {
-            for brush in brushes {
-                brush.check_writable()?
-            }
+        for brush in &self.brushes {
+            brush.check_writable()?
         }
 
         Ok(())
@@ -193,56 +198,44 @@ impl CheckWritable for HalfSpace {
 }
 
 #[derive(Clone, Copy)]
-pub enum Alignment {
-    Standard(BaseAlignment),
-    Valve220(BaseAlignment, [Vec3; 2]),
+pub struct Alignment {
+    pub offset: Vec2,
+    pub rotation: f64,
+    pub scale: Vec2,
+    pub axes: Option<[Vec3; 2]>,
 }
 
 impl Alignment {
-    pub fn base(&self) -> &BaseAlignment {
-        match self {
-            Alignment::Standard(base) => base,
-            Alignment::Valve220(base, _) => base,
-        }
-    }
-
-    pub fn base_mut(&mut self) -> &mut BaseAlignment {
-        match *self {
-            Alignment::Standard(ref mut base) => base,
-            Alignment::Valve220(ref mut base, _) => base,
-        }
-    }
-
     #[cfg(feature = "std")]
     fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
-        match self {
-            Alignment::Standard(base) => {
+        match self.axes {
+            None => {
                 write!(
                     writer,
                     "{} {} {} {} {}",
-                    base.offset[0],
-                    base.offset[1],
-                    base.rotation,
-                    base.scale[0],
-                    base.scale[1]
+                    self.offset[0],
+                    self.offset[1],
+                    self.rotation,
+                    self.scale[0],
+                    self.scale[1]
                 )
                 .map_err(WriteError::Io)?;
             }
-            Alignment::Valve220(base, [u, v]) => {
+            Some([u, v]) => {
                 write!(
                     writer,
                     "[ {} {} {} {} ] [ {} {} {} {} ] {} {} {}",
                     u[0],
                     u[1],
                     u[2],
-                    base.offset[0],
+                    self.offset[0],
                     v[0],
                     v[1],
                     v[2],
-                    base.offset[1],
-                    base.rotation,
-                    base.scale[0],
-                    base.scale[1]
+                    self.offset[1],
+                    self.rotation,
+                    self.scale[0],
+                    self.scale[1]
                 )
                 .map_err(WriteError::Io)?;
             }
@@ -253,33 +246,16 @@ impl Alignment {
 
 impl CheckWritable for Alignment {
     fn check_writable(&self) -> ValidationResult {
-        match self {
-            Alignment::Standard(base) => base.check_writable(),
-            Alignment::Valve220(base, axes) => {
-                base.check_writable()?;
-
-                for axis in axes {
-                    check_writable_array(*axis)?;
-                }
-
-                Ok(())
-            }
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct BaseAlignment {
-    pub offset: Vec2,
-    pub rotation: f64,
-    pub scale: Vec2,
-}
-
-impl CheckWritable for BaseAlignment {
-    fn check_writable(&self) -> ValidationResult {
         check_writable_array(self.offset)?;
         check_writable_f64(self.rotation)?;
         check_writable_array(self.scale)?;
+
+        if let Some(axes) = self.axes {
+            for axis in axes {
+                check_writable_array(axis)?;
+            }
+        }
+
         Ok(())
     }
 }

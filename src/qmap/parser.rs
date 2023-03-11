@@ -5,9 +5,7 @@ use std::{io::Read, iter::Peekable, num::NonZeroU8, str::FromStr, vec::Vec};
 
 use crate::qmap;
 use qmap::lexer::{Token, TokenIterator};
-use qmap::repr::{
-    Alignment, BaseAlignment, Brush, Edict, Entity, Point, QuakeMap, Surface,
-};
+use qmap::repr::{Alignment, Brush, Edict, Entity, Point, QuakeMap, Surface};
 use qmap::ParseResult;
 
 type TokenPeekable<R> = Peekable<TokenIterator<R>>;
@@ -33,10 +31,7 @@ fn parse_entity<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Entity> {
 
     expect_byte(&tokens.next().transpose()?, b'}')?;
 
-    match brushes.len() {
-        0 => Ok(Entity::Point(edict)),
-        _ => Ok(Entity::Brush(edict, brushes)),
-    }
+    Ok(Entity { edict, brushes })
 }
 
 fn parse_edict<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Edict> {
@@ -116,7 +111,7 @@ fn parse_surface<R: Read>(
         if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'[') {
             parse_valve_alignment(tokens)?
         } else {
-            parse_standard_alignment(tokens)?
+            parse_legacy_alignment(tokens)?
         }
     } else {
         return Err(qmap::ParseError::eof());
@@ -139,7 +134,7 @@ fn parse_point<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Point> {
     Ok([x, y, z])
 }
 
-fn parse_standard_alignment<R: Read>(
+fn parse_legacy_alignment<R: Read>(
     tokens: &mut TokenPeekable<R>,
 ) -> ParseResult<Alignment> {
     let offset_x = expect_float(&tokens.next().transpose()?)?;
@@ -148,11 +143,12 @@ fn parse_standard_alignment<R: Read>(
     let scale_x = expect_float(&tokens.next().transpose()?)?;
     let scale_y = expect_float(&tokens.next().transpose()?)?;
 
-    Ok(Alignment::Standard(BaseAlignment {
+    Ok(Alignment {
         offset: [offset_x, offset_y],
         rotation,
         scale: [scale_x, scale_y],
-    }))
+        axes: None,
+    })
 }
 
 fn parse_valve_alignment<R: Read>(
@@ -176,14 +172,12 @@ fn parse_valve_alignment<R: Read>(
     let scale_x = expect_float(&tokens.next().transpose()?)?;
     let scale_y = expect_float(&tokens.next().transpose()?)?;
 
-    Ok(Alignment::Valve220(
-        BaseAlignment {
-            offset: [offset_x, offset_y],
-            rotation,
-            scale: [scale_x, scale_y],
-        },
-        [[u_x, u_y, u_z], [v_x, v_y, v_z]],
-    ))
+    Ok(Alignment {
+        offset: [offset_x, offset_y],
+        rotation,
+        scale: [scale_x, scale_y],
+        axes: Some([[u_x, u_y, u_z], [v_x, v_y, v_z]]),
+    })
 }
 
 fn expect_byte(token: &Option<Token>, byte: u8) -> ParseResult<()> {
