@@ -1,6 +1,6 @@
 use crate::qmap;
 use qmap::parser::parse;
-use qmap::{Alignment, Entity, ParseError};
+use qmap::{EntityKind, ParseError};
 use std::ffi::CString;
 use std::io;
 
@@ -18,20 +18,8 @@ impl io::Read for ErroringReader {
     }
 }
 
-fn panic_expected_brush() {
-    panic!("Expected brush entity, found point entity");
-}
-
 fn panic_expected_point() {
     panic!("Expected point entity, found brush entity");
-}
-
-fn panic_expected_standard() {
-    panic!("Expected standard surface, found Valve220 surface");
-}
-
-fn panic_expected_valve() {
-    panic!("Expected Valve220 surface, found standard surface");
 }
 
 fn panic_unexpected_variant<T: std::fmt::Display>(err: T) {
@@ -51,10 +39,8 @@ fn parse_empty_point_entity() {
     let map = parse(&b"{ }"[..]).unwrap();
     assert_eq!(map.entities.len(), 1);
     let ent = &map.entities[0];
-    assert_eq!(ent.edict().len(), 0);
-
-    if let Entity::Point(_) = ent {
-    } else {
+    assert_eq!(ent.edict.len(), 0);
+    if ent.kind() != EntityKind::Point {
         panic_expected_point();
     }
 }
@@ -71,7 +57,7 @@ fn parse_point_entity_with_key_value() {
     .unwrap();
     assert_eq!(map.entities.len(), 1);
     let ent = &map.entities[0];
-    let edict = ent.edict();
+    let edict = &ent.edict;
     assert_eq!(edict.len(), 1);
     assert_eq!(
         edict.iter().next().unwrap(),
@@ -96,28 +82,18 @@ fn parse_standard_brush_entity() {
     .unwrap();
     assert_eq!(map.entities.len(), 1);
     let ent = &map.entities[0];
-
-    if let Entity::Brush(_, brushes) = ent {
-        assert_eq!(brushes.len(), 1);
-        let brush = &brushes[0];
-        assert_eq!(brush.len(), 1);
-        let surface = &brush[0];
-        assert_eq!(
-            surface.half_space,
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
-        );
-        assert_eq!(surface.texture, CString::new("TEXTURE1").unwrap());
-
-        if let Alignment::Standard(base) = surface.alignment {
-            assert_eq!(base.offset, [0.0, 0.0]);
-            assert_eq!(base.rotation, 0.0);
-            assert_eq!(base.scale, [1.0, 1.0]);
-        } else {
-            panic_expected_standard();
-        }
-    } else {
-        panic_expected_brush();
-    }
+    assert_eq!(ent.brushes.len(), 1);
+    let brush = &ent.brushes[0];
+    assert_eq!(brush.len(), 1);
+    let surface = &brush[0];
+    assert_eq!(
+        surface.half_space,
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+    );
+    assert_eq!(surface.texture, CString::new("TEXTURE1").unwrap());
+    assert_eq!(surface.alignment.offset, [0.0, 0.0]);
+    assert_eq!(surface.alignment.rotation, 0.0);
+    assert_eq!(surface.alignment.scale, [1.0, 1.0]);
 }
 
 #[test]
@@ -134,30 +110,23 @@ fn parse_valve_brush_entity() {
     .unwrap();
     assert_eq!(map.entities.len(), 1);
     let ent = &map.entities[0];
-    assert_eq!(ent.edict().len(), 0);
-
-    if let Entity::Brush(_, brushes) = ent {
-        assert_eq!(brushes.len(), 1);
-        let brush = &brushes[0];
-        assert_eq!(brush.len(), 1);
-        let surface = &brush[0];
-        assert_eq!(
-            surface.half_space,
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
-        );
-        assert_eq!(surface.texture, CString::new("TEX2").unwrap());
-
-        if let Alignment::Valve220(base, axes) = surface.alignment {
-            assert_eq!(base.offset, [0.0, 0.0]);
-            assert_eq!(base.rotation, 0.0);
-            assert_eq!(base.scale, [1.0, 1.0]);
-            assert_eq!(axes, [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]);
-        } else {
-            panic_expected_valve();
-        }
-    } else {
-        panic_expected_brush();
-    }
+    assert_eq!(ent.edict.len(), 0);
+    assert_eq!(ent.brushes.len(), 1);
+    let brush = &ent.brushes[0];
+    assert_eq!(brush.len(), 1);
+    let surface = &brush[0];
+    assert_eq!(
+        surface.half_space,
+        [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+    );
+    assert_eq!(surface.texture, CString::new("TEX2").unwrap());
+    assert_eq!(surface.alignment.offset, [0.0, 0.0]);
+    assert_eq!(surface.alignment.rotation, 0.0);
+    assert_eq!(surface.alignment.scale, [1.0, 1.0]);
+    assert_eq!(
+        surface.alignment.axes,
+        Some([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+    );
 }
 
 #[test]
@@ -172,29 +141,22 @@ fn parse_weird_numbers() {
     )
     .unwrap();
 
-    if let Entity::Brush(_, brushes) = &map.entities[0] {
-        let brush = &brushes[0];
-        let surface = &brush[0];
+    let brushes = &map.entities[0].brushes;
+    let brush = &brushes[0];
+    let surface = &brush[0];
 
-        assert_eq!(
-            surface.half_space,
-            [
-                [9E99, 1E-9, -1.37e9],
-                [12.0, 0.0, -100.7],
-                [0.0, 0.0, 1.2e34]
-            ]
-        );
+    assert_eq!(
+        surface.half_space,
+        [
+            [9E99, 1E-9, -1.37e9],
+            [12.0, 0.0, -100.7],
+            [0.0, 0.0, 1.2e34]
+        ]
+    );
 
-        if let Alignment::Standard(base) = surface.alignment {
-            assert_eq!(base.offset, [0.25, 0.25]);
-            assert_eq!(base.rotation, 45.0);
-            assert_eq!(base.scale, [2.0001, 2.002]);
-        } else {
-            panic_expected_standard();
-        }
-    } else {
-        panic_expected_brush();
-    }
+    assert_eq!(surface.alignment.offset, [0.25, 0.25]);
+    assert_eq!(surface.alignment.rotation, 45.0);
+    assert_eq!(surface.alignment.scale, [2.0001, 2.002]);
 }
 
 #[test]
@@ -218,16 +180,13 @@ fn parse_weird_textures() {
     )
     .unwrap();
 
-    if let Entity::Brush(_, brushes) = &map.entities[0] {
-        let surface1 = &(&brushes[0])[0];
-        let surface2 = &(&brushes[0])[1];
-        let surface3 = &(&brushes[0])[2];
-        assert_eq!(surface1.texture, CString::new("{FENCE").unwrap());
-        assert_eq!(surface2.texture, CString::new("spaced out").unwrap());
-        assert_eq!(surface3.texture, CString::new(r#"silly"example"#).unwrap());
-    } else {
-        panic_expected_brush();
-    }
+    let brushes = &map.entities[0].brushes;
+    let surface1 = &(brushes[0])[0];
+    let surface2 = &(brushes[0])[1];
+    let surface3 = &(brushes[0])[2];
+    assert_eq!(surface1.texture, CString::new("{FENCE").unwrap());
+    assert_eq!(surface2.texture, CString::new("spaced out").unwrap());
+    assert_eq!(surface3.texture, CString::new(r#"silly"example"#).unwrap());
 }
 
 // Parse errors
