@@ -227,7 +227,7 @@ fn parse_closing_brace_error() {
     let err = parse(&b"}"[..]).err().unwrap();
     if let ParseError::Parser(line_err) = err {
         assert_eq!(u64::from(line_err.line_number.unwrap()), 1u64);
-        assert!(line_err.message.contains("}"));
+        assert!(line_err.message.contains('}'));
     } else {
         panic_unexpected_variant(err);
     }
@@ -238,7 +238,7 @@ fn parse_missing_value() {
     let err = parse(&b"{\n \"classname\"\n }"[..]).err().unwrap();
     if let ParseError::Parser(line_err) = err {
         assert_eq!(u64::from(line_err.line_number.unwrap()), 3u64);
-        assert!(line_err.message.contains("}"));
+        assert!(line_err.message.contains('}'));
     } else {
         panic_unexpected_variant(err);
     }
