@@ -7,7 +7,10 @@ extern crate alloc;
 #[cfg(feature = "std")]
 use std::{
     collections::HashMap,
+    error,
     ffi::{CStr, CString},
+    fmt,
+    fmt::{Display, Formatter},
     io,
     string::String,
     vec::Vec,
@@ -31,6 +34,19 @@ pub enum WriteError {
     Validation(String),
     Io(std::io::Error),
 }
+
+#[cfg(feature = "std")]
+impl Display for WriteError {
+    fn fmt(&self, formatter: &mut Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Self::Validation(msg) => write!(formatter, "Validation: {}", msg),
+            Self::Io(err) => write!(formatter, "I/O: {}", err),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl error::Error for WriteError {}
 
 #[cfg(feature = "std")]
 pub type WriteAttempt = Result<(), WriteError>;

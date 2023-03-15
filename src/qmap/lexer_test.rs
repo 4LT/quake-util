@@ -56,7 +56,7 @@ fn lex_all_symbols() {
 #[test]
 fn lex_bad_quoted() {
     let input = b"good-token \"bad-token eof-here-we-come";
-    let bad_token = TokenIterator::new(&input[..]).skip(1).next();
+    let bad_token = TokenIterator::new(&input[..]).nth(1);
 
     if let Err(qmap_error) = bad_token.unwrap() {
         if let ParseError::Lexer(line_error) = qmap_error {

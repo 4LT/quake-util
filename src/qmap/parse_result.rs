@@ -1,8 +1,7 @@
-#[cfg(feature = "std")]
 extern crate std;
 
 use std::{
-    fmt,
+    error, fmt,
     num::NonZeroU64,
     string::{String, ToString},
 };
@@ -21,6 +20,8 @@ impl fmt::Display for LineError {
         }
     }
 }
+
+impl error::Error for LineError {}
 
 #[derive(Debug, Clone)]
 pub enum ParseError {
@@ -65,5 +66,7 @@ impl fmt::Display for ParseError {
         }
     }
 }
+
+impl error::Error for ParseError {}
 
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
