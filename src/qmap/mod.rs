@@ -1,13 +1,13 @@
-pub mod repr;
+mod repr;
 
 #[cfg(feature = "std")]
 mod lexer;
 
 #[cfg(feature = "std")]
-pub mod parser;
+mod parser;
 
 #[cfg(feature = "std")]
-pub mod parse_result;
+mod parse_result;
 
 pub use repr::{
     Alignment, Brush, CheckWritable, Edict, Entity, EntityKind, HalfSpace,
