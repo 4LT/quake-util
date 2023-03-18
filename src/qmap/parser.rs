@@ -89,7 +89,7 @@ fn parse_brush<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Brush> {
         }
     }
 
-    expect_byte(&tokens.next().transpose()?, b'}')?;
+    expect_byte_or(&tokens.next().transpose()?, b'}', &[b'('])?;
     Ok(surfaces)
 }
 
@@ -197,6 +197,35 @@ fn expect_byte(token: &Option<Token>, byte: u8) -> ParseResult<()> {
             ),
             payload.line_number,
         )),
+        _ => Err(qmap::ParseError::eof()),
+    }
+}
+
+fn expect_byte_or(
+    token: &Option<Token>,
+    byte: u8,
+    rest: &[u8],
+) -> ParseResult<()> {
+    match token.as_ref() {
+        Some(payload) if payload.match_byte(byte) => Ok(()),
+        Some(payload) => {
+            let rest_str = (&rest
+                .iter()
+                .copied()
+                .map(|b| format!("`{}`", char::from(b)))
+                .collect::<Vec<_>>()[..])
+                .join(", ");
+
+            Err(qmap::ParseError::from_parser(
+                format!(
+                    "Expected {} or `{}`, got `{}`",
+                    rest_str,
+                    char::from(byte),
+                    payload.text_as_string()
+                ),
+                payload.line_number,
+            ))
+        }
         _ => Err(qmap::ParseError::eof()),
     }
 }
