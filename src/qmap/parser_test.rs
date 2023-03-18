@@ -258,3 +258,22 @@ fn parse_bad_texture_name() {
         panic_unexpected_variant(err);
     }
 }
+
+#[test]
+fn parse_unclosed_surface() {
+    let map_text = br#"
+        {
+            "classname" "world"
+        {
+            ( 1 2 3 ) ( 2 3 1 ) ( 3 1 2 ) tex 0 0 0 1 1
+        {
+    "#;
+    let err = parse(&map_text[..]).err().unwrap();
+    if let ParseError::Parser(line_err) = err {
+        let (pfx, _) = line_err.message.split_once("got").unwrap();
+        assert!(pfx.contains("`}`"));
+        assert!(pfx.contains("`(`"));
+    } else {
+        panic_unexpected_variant(err);
+    }
+}

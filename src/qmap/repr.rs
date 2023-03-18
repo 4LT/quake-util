@@ -22,9 +22,17 @@ use {
     core::ffi::CStr, hashbrown::HashMap,
 };
 
+/// Return type for validating writability of entities and other items
 pub type ValidationResult = Result<(), String>;
 
+/// Validation of entities and other items
 pub trait CheckWritable {
+    /// Determine if an item can be written to file
+    ///
+    /// Note that passing this check only implies that the item can be written
+    /// to file and can also be parsed back non-destructively.  It is up to the
+    /// consumer to ensure that the maps written are in a form that can be used
+    /// by other tools, e.g. qbsp.
     fn check_writable(&self) -> ValidationResult;
 }
 
@@ -51,22 +59,30 @@ impl error::Error for WriteError {}
 #[cfg(feature = "std")]
 pub type WriteAttempt = Result<(), WriteError>;
 
+/// 3-dimensional point used to determine the half-space a surface lies on
 pub type Point = [f64; 3];
 pub type Vec3 = [f64; 3];
 pub type Vec2 = [f64; 2];
 
+/// Transparent data structure representing a Quake source map
+///
+/// Contains a list of entities. Internal texture alignments may be in the
+/// original "legacy" Id format, the "Valve 220" format, or a mix of the two.
 #[derive(Clone)]
 pub struct QuakeMap {
     pub entities: Vec<Entity>,
 }
 
 impl QuakeMap {
+    /// Instantiate a new map with 0 entities
     pub const fn new() -> Self {
         QuakeMap {
             entities: Vec::new(),
         }
     }
 
+    /// Writes the map to the provided writer in text format, failing if
+    /// validation fails or an I/O error occurs
     #[cfg(feature = "std")]
     pub fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
         for ent in &self.entities {
@@ -86,12 +102,15 @@ impl CheckWritable for QuakeMap {
     }
 }
 
+/// Entity type: `Brush` for entities with brushes, `Point` for entities without
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum EntityKind {
     Point,
     Brush,
 }
 
+/// A collection of key/value pairs in the form of an *edict* and 0 or more
+/// brushes
 #[derive(Clone)]
 pub struct Entity {
     pub edict: Edict,
@@ -99,6 +118,7 @@ pub struct Entity {
 }
 
 impl Entity {
+    /// Instantiate a new entity without any keyvalues or brushes
     pub fn new() -> Self {
         Entity {
             edict: Edict::new(),
@@ -106,6 +126,7 @@ impl Entity {
         }
     }
 
+    /// Determine whether this is a point or brush entity
     pub fn kind(&self) -> EntityKind {
         if self.brushes.is_empty() {
             EntityKind::Point
@@ -132,6 +153,7 @@ impl Entity {
 }
 
 impl Default for Entity {
+    /// Same as `Entity::new`
     fn default() -> Self {
         Entity::new()
     }
@@ -149,6 +171,7 @@ impl CheckWritable for Entity {
     }
 }
 
+/// Entity dictionary
 pub type Edict = HashMap<CString, CString>;
 
 impl CheckWritable for Edict {
@@ -162,6 +185,7 @@ impl CheckWritable for Edict {
     }
 }
 
+/// Convex polyhedron
 pub type Brush = Vec<Surface>;
 
 impl CheckWritable for Brush {
@@ -174,6 +198,7 @@ impl CheckWritable for Brush {
     }
 }
 
+/// Brush face
 #[derive(Clone)]
 pub struct Surface {
     pub half_space: HalfSpace,
@@ -201,6 +226,8 @@ impl CheckWritable for Surface {
     }
 }
 
+/// A set of 3 points that determine a plane with its facing direction
+/// determined by the winding order of the points
 pub type HalfSpace = [Point; 3];
 
 impl CheckWritable for HalfSpace {
@@ -213,11 +240,17 @@ impl CheckWritable for HalfSpace {
     }
 }
 
+/// Texture alignment properties
+///
+/// If axes are present, the alignment will be written in the "Valve220" format;
+/// otherwise it will be written in the "legacy" format pre-dating Valve220.
 #[derive(Clone, Copy)]
 pub struct Alignment {
     pub offset: Vec2,
     pub rotation: f64,
     pub scale: Vec2,
+
+    /// Describes the X and Y texture-space axes
     pub axes: Option<[Vec3; 2]>,
 }
 
