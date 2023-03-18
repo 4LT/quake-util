@@ -11,6 +11,12 @@ use qmap::ParseResult;
 type TokenPeekable<R> = Peekable<TokenIterator<R>>;
 const MIN_BRUSH_SURFACES: usize = 4;
 
+/// Parses a Quake source map
+///
+/// Maps must be in the Quake 1 format (Quake 2 surface flags and Quake 3
+/// `brushDef`s/`patchDef`s are not presently supported) but may have texture
+/// alignment in either "Valve220" format or the "legacy" predecessor (i.e.
+/// without texture axes)
 pub fn parse<R: Read>(reader: R) -> ParseResult<QuakeMap> {
     let mut entities: Vec<Entity> = Vec::new();
     let mut peekable_tokens = TokenIterator::new(reader).peekable();

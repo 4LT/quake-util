@@ -1,3 +1,5 @@
+//! Quake source map data structures, parsing, and writing
+
 mod repr;
 
 #[cfg(feature = "std")]
