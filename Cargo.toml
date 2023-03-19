@@ -1,6 +1,6 @@
 [package]
 name = "quake-util"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Seth <rader.seth@gmail.com>"]
 edition = "2021"
 description = "A utility library for using Quake file formats"
