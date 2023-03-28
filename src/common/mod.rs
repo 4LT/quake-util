@@ -1,3 +1,5 @@
+use std::ffi::CString;
+
 pub type Palette = [[u8; 3]; 256];
 
 pub const QUAKE_PALETTE: Palette =
@@ -22,4 +24,18 @@ impl<T: Copy + Default> Default for Junk<T> {
             _value: T::default(),
         }
     }
+}
+
+pub fn slice_to_cstring(slice: &[u8]) -> std::ffi::CString {
+    let mut len = 0;
+
+    while len < slice.len() {
+        if slice[len] == 0u8 {
+            break;
+        }
+
+        len += 1;
+    }
+
+    CString::new(&slice[..len]).unwrap()
 }

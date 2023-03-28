@@ -4,7 +4,6 @@ use wad::Lump;
 use std::env::args;
 use std::fs::{create_dir_all, File};
 use std::io::{BufReader, BufWriter, Write};
-use std::mem::transmute;
 use std::path::PathBuf;
 
 use png::{ColorType, Encoder};

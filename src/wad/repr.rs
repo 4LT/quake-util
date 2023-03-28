@@ -1,9 +1,9 @@
 use std::boxed::Box;
 use std::ffi::CString;
-use std::mem::{size_of, size_of_val, transmute};
+use std::mem::size_of;
 use std::string::{String, ToString};
 
-use crate::{Junk, Palette};
+use crate::{slice_to_cstring, Junk, Palette};
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
 pub const PAL_LUMP_ID: u8 = 0x40;
@@ -41,19 +41,26 @@ impl TryFrom<[u8; size_of::<Head>()]> for Head {
     type Error = String;
 
     fn try_from(bytes: [u8; size_of::<Head>()]) -> Result<Self, Self::Error> {
-        if &bytes[0..4] != &MAGIC[..] {
+        let mut chunks = bytes.chunks_exact(4usize);
+
+        if chunks.next().unwrap() != &MAGIC[..] {
             let magic_str: String =
                 MAGIC.iter().copied().map(char::from).collect();
 
             return Err(format!("Magic number does not match `{magic_str}`"));
         }
 
-        let mut header: Head = unsafe { transmute(bytes) };
+        let entry_count = u32::from_le_bytes(
+            <[u8; 4]>::try_from(chunks.next().unwrap())
+                .map_err(|e| e.to_string())?,
+        );
 
-        header.entry_count = header.entry_count.to_le();
-        header.directory_offset = header.directory_offset.to_le();
+        let directory_offset = u32::from_le_bytes(
+            <[u8; 4]>::try_from(chunks.next().unwrap())
+                .map_err(|e| e.to_string())?,
+        );
 
-        Ok(header)
+        Ok(Head::new(entry_count, directory_offset))
     }
 }
 
@@ -70,42 +77,20 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(config: EntryConfig) -> Result<Entry, String> {
-        let name_sz = config.name;
-        let name_bytes = name_sz.as_bytes();
-
-        let name_bytes = if name_bytes.len() <= 16 {
-            name_bytes
-        } else {
-            return Err(format!("Lump name `{:#?}` too long", name_sz));
-        };
-
-        let mut name = [0u8; 16];
-        (&mut name[..name_bytes.len()]).copy_from_slice(name_bytes);
-
-        Ok(Entry {
+    pub fn new(config: EntryConfig) -> Entry {
+        Entry {
             offset: config.offset,
             length: config.length,
             uncompressed_length: config.length,
             lump_kind: config.lump_kind,
             compression: 0u8,
             _padding: Junk::default(),
-            name,
-        })
+            name: config.name,
+        }
     }
 
     pub fn name_as_cstring(&self) -> CString {
-        let mut len = 0;
-
-        while len < size_of_val(&self.name) {
-            if self.name[len] == 0u8 {
-                break;
-            }
-
-            len += 1;
-        }
-
-        CString::new(&self.name[0..len]).unwrap()
+        slice_to_cstring(&self.name)
     }
 
     pub fn name(&self) -> [u8; 16] {
@@ -129,23 +114,45 @@ impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
     type Error = String;
 
     fn try_from(bytes: [u8; size_of::<Entry>()]) -> Result<Self, Self::Error> {
-        let mut entry: Entry = unsafe { transmute(bytes) };
+        let (offset_bytes, rest) = bytes.split_at(4);
 
-        entry.offset = entry.offset.to_le();
-        entry.length = entry.length.to_le();
-        entry.uncompressed_length = entry.uncompressed_length.to_le();
+        let offset =
+            u32::from_le_bytes(<[u8; 4]>::try_from(offset_bytes).unwrap());
 
-        if entry.compression != 0u8 {
+        let (length_bytes, rest) = rest.split_at(4);
+
+        let length =
+            u32::from_le_bytes(<[u8; 4]>::try_from(length_bytes).unwrap());
+
+        let (uc_length_bytes, rest) = rest.split_at(4);
+
+        let _uc_length =
+            u32::from_le_bytes(<[u8; 4]>::try_from(uc_length_bytes).unwrap());
+
+        let (&[lump_kind], rest) = rest.split_at(1) else {
+            unreachable!()
+        };
+
+        let (&[compression], rest) = rest.split_at(1) else {
+            unreachable!()
+        };
+
+        if compression != 0 {
             return Err("Compression is unsupported".to_string());
         }
-
-        let lump_kind = entry.lump_kind;
 
         if !expected_lump_kind(lump_kind) {
             return Err(format!("Unexpected lump type `{lump_kind}`"));
         }
 
-        Ok(entry)
+        let name: [u8; 16] = rest[2..].try_into().unwrap();
+
+        Ok(Entry::new(EntryConfig {
+            offset,
+            length,
+            lump_kind,
+            name,
+        }))
     }
 }
 
@@ -154,7 +161,7 @@ pub struct EntryConfig {
     offset: u32,
     length: u32,
     lump_kind: u8,
-    name: CString,
+    name: [u8; 16],
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -268,17 +275,21 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
     fn try_from(
         bytes: [u8; size_of::<MipTextureHead>()],
     ) -> Result<Self, Self::Error> {
-        let mut head: MipTextureHead = unsafe { transmute(bytes) };
+        let name = <[u8; 16]>::try_from(&bytes[..16]).unwrap();
 
-        head.width = head.width.to_le();
-        let width = head.width;
+        let bytes = &bytes[16..];
+
+        let width =
+            u32::from_le_bytes(<[u8; 4]>::try_from(&bytes[..4]).unwrap());
+
+        let bytes = &bytes[4..];
+
+        let height =
+            u32::from_le_bytes(<[u8; 4]>::try_from(&bytes[..4]).unwrap());
 
         if width % 8 != 0 {
             return Err(format!("Invalid width {}", width));
         }
-
-        head.height = head.height.to_le();
-        let height = head.height;
 
         if height % 8 != 0 {
             return Err(format!("Invalid height {}", height));
@@ -288,11 +299,22 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
             .checked_mul(height)
             .ok_or("Texture too large".to_string())?;
 
+        let bytes = &bytes[4..];
+
+        let mut offsets = [0u32; 4];
+
         for i in 0..4 {
-            head.offsets[i] = head.offsets[i].to_le();
+            offsets[i] = u32::from_le_bytes(
+                <[u8; 4]>::try_from(&bytes[(4 * i)..(4 * i + 4)]).unwrap(),
+            );
         }
 
-        Ok(head)
+        Ok(MipTextureHead {
+            name,
+            width,
+            height,
+            offsets,
+        })
     }
 }
 

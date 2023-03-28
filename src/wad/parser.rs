@@ -5,7 +5,7 @@ use crate::wad::repr::{
 };
 use std::boxed::Box;
 use std::io::{Read, Seek, SeekFrom};
-use std::mem::{size_of, size_of_val, transmute, MaybeUninit};
+use std::mem::{size_of, size_of_val, MaybeUninit};
 use std::string::{String, ToString};
 use std::vec::Vec;
 
@@ -47,22 +47,18 @@ pub fn parse_lump(
 
     let byte_ct = entry.length().try_into().unwrap();
 
-    let mut bytes = Vec::<u8>::with_capacity(byte_ct);
-
     cursor
         .seek(SeekFrom::Start(entry.offset().into()))
         .map_err(|e| e.to_string())?;
 
-    cursor
-        .read_exact(unsafe {
-            transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(
-                bytes.spare_capacity_mut(),
-            )
-        })
+    let bytes = cursor
+        .bytes()
+        .take(byte_ct)
+        .collect::<Result<Vec<u8>, _>>()
         .map_err(|e| e.to_string())?;
 
-    unsafe {
-        bytes.set_len(byte_ct);
+    if bytes.len() != byte_ct {
+        return Err("Reached EOF before end of lump".to_string());
     }
 
     let mut kind = entry.lump_kind();
