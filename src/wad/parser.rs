@@ -1,10 +1,9 @@
 use crate::common::Palette;
 use crate::wad::repr::{
-    Image, Lump, MipTexture, MipTextureHead, Wad, WadEntry, WadHead,
-    FLAT_LUMP_ID, MIPTEX_LUMP_ID, PAL_LUMP_ID, SBAR_LUMP_ID,
+    Entry, Head, Image, Lump, MipTexture, MipTextureHead, FLAT_LUMP_ID,
+    MIPTEX_LUMP_ID, PAL_LUMP_ID, SBAR_LUMP_ID,
 };
 use std::boxed::Box;
-use std::ffi::CString;
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::{size_of, size_of_val, transmute, MaybeUninit};
 use std::string::{String, ToString};
@@ -12,29 +11,28 @@ use std::vec::Vec;
 
 pub fn parse_directory(
     mut cursor: impl Seek + Read,
-) -> Result<Vec<WadEntry>, String> {
+) -> Result<Vec<Entry>, String> {
     cursor.rewind().map_err(|e| e.to_string())?;
-    let mut header_bytes = [0u8; size_of::<WadHead>()];
+    let mut header_bytes = [0u8; size_of::<Head>()];
     cursor
         .read_exact(&mut header_bytes[..])
         .map_err(|e| e.to_string())?;
-    let header: WadHead = header_bytes.try_into()?;
+    let header: Head = header_bytes.try_into()?;
     let entry_ct = header.entry_count();
     let dir_offset = header.directory_offset();
     cursor
         .seek(SeekFrom::Start(dir_offset.into()))
         .map_err(|e| e.to_string())?;
 
-    let mut entries =
-        Vec::<WadEntry>::with_capacity(entry_ct.try_into().unwrap());
+    let mut entries = Vec::<Entry>::with_capacity(entry_ct.try_into().unwrap());
 
     for _ in 0..entry_ct {
-        const WAD_ENTRY_SIZE: usize = size_of::<WadEntry>();
+        const WAD_ENTRY_SIZE: usize = size_of::<Entry>();
         let mut entry_bytes = [0u8; WAD_ENTRY_SIZE];
         cursor
             .read_exact(&mut entry_bytes[0..WAD_ENTRY_SIZE])
             .map_err(|e| e.to_string())?;
-        let entry: WadEntry = entry_bytes.try_into()?;
+        let entry: Entry = entry_bytes.try_into()?;
         entries.push(entry);
     }
 
@@ -42,7 +40,7 @@ pub fn parse_directory(
 }
 
 pub fn parse_lump(
-    entry: &WadEntry,
+    entry: &Entry,
     mut cursor: impl Seek + Read,
 ) -> Result<Lump, String> {
     const CONCHARS: [u8; 9] = *b"CONCHARS\0";

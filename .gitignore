@@ -1,4 +1,5 @@
 /target
+/dump
 Cargo.lock
 
 /test-res/lg-file

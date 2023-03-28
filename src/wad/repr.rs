@@ -2,7 +2,6 @@ use std::boxed::Box;
 use std::ffi::CString;
 use std::mem::{size_of, size_of_val, transmute};
 use std::string::{String, ToString};
-use std::vec::Vec;
 
 use crate::common::{Junk, Palette};
 
@@ -14,15 +13,15 @@ pub const FLAT_LUMP_ID: u8 = 0x45;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(C, packed)]
-pub struct WadHead {
+pub struct Head {
     magic: [u8; 4],
     entry_count: u32,
     directory_offset: u32,
 }
 
-impl WadHead {
+impl Head {
     pub fn new(entry_count: u32, directory_offset: u32) -> Self {
-        WadHead {
+        Head {
             magic: MAGIC,
             entry_count,
             directory_offset,
@@ -38,12 +37,10 @@ impl WadHead {
     }
 }
 
-impl TryFrom<[u8; size_of::<WadHead>()]> for WadHead {
+impl TryFrom<[u8; size_of::<Head>()]> for Head {
     type Error = String;
 
-    fn try_from(
-        bytes: [u8; size_of::<WadHead>()],
-    ) -> Result<Self, Self::Error> {
+    fn try_from(bytes: [u8; size_of::<Head>()]) -> Result<Self, Self::Error> {
         if &bytes[0..4] != &MAGIC[..] {
             let magic_str: String =
                 MAGIC.iter().copied().map(char::from).collect();
@@ -51,7 +48,7 @@ impl TryFrom<[u8; size_of::<WadHead>()]> for WadHead {
             return Err(format!("Magic number does not match `{magic_str}`"));
         }
 
-        let mut header: WadHead = unsafe { transmute(bytes) };
+        let mut header: Head = unsafe { transmute(bytes) };
 
         header.entry_count = header.entry_count.to_le();
         header.directory_offset = header.directory_offset.to_le();
@@ -62,7 +59,7 @@ impl TryFrom<[u8; size_of::<WadHead>()]> for WadHead {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(C, packed)]
-pub struct WadEntry {
+pub struct Entry {
     offset: u32,
     length: u32,
     uncompressed_length: u32, // unused?
@@ -72,8 +69,8 @@ pub struct WadEntry {
     name: [u8; 16],
 }
 
-impl WadEntry {
-    pub fn new(config: WadEntryConfig) -> Result<WadEntry, String> {
+impl Entry {
+    pub fn new(config: EntryConfig) -> Result<Entry, String> {
         let name_sz = config.name;
         let name_bytes = name_sz.as_bytes();
 
@@ -86,7 +83,7 @@ impl WadEntry {
         let mut name = [0u8; 16];
         (&mut name[..name_bytes.len()]).copy_from_slice(name_bytes);
 
-        Ok(WadEntry {
+        Ok(Entry {
             offset: config.offset,
             length: config.length,
             uncompressed_length: config.length,
@@ -128,13 +125,11 @@ impl WadEntry {
     }
 }
 
-impl TryFrom<[u8; size_of::<WadEntry>()]> for WadEntry {
+impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
     type Error = String;
 
-    fn try_from(
-        bytes: [u8; size_of::<WadEntry>()],
-    ) -> Result<Self, Self::Error> {
-        let mut entry: WadEntry = unsafe { transmute(bytes) };
+    fn try_from(bytes: [u8; size_of::<Entry>()]) -> Result<Self, Self::Error> {
+        let mut entry: Entry = unsafe { transmute(bytes) };
 
         entry.offset = entry.offset.to_le();
         entry.length = entry.length.to_le();
@@ -155,16 +150,11 @@ impl TryFrom<[u8; size_of::<WadEntry>()]> for WadEntry {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct WadEntryConfig {
+pub struct EntryConfig {
     offset: u32,
     length: u32,
     lump_kind: u8,
     name: CString,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Wad {
-    pub lumps: Vec<(CString, Lump)>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
