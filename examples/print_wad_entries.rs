@@ -22,7 +22,7 @@ fn main() {
         let name = entry.name_as_cstring();
         let name = name.to_string_lossy();
 
-        let mut lump = wad::parse_lump(&entry, &mut reader)
+        let lump = wad::parse_lump(&entry, &mut reader)
             .map_err(|e| format!("`{}`: {}", name, e))
             .unwrap();
 

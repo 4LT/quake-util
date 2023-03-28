@@ -1,5 +1,4 @@
-use common::Palette;
-use quake_util::{common, wad};
+use quake_util::{wad, Palette, QUAKE_PALETTE};
 use wad::Lump;
 
 use std::env::args;
@@ -9,8 +8,6 @@ use std::mem::transmute;
 use std::path::PathBuf;
 
 use png::{ColorType, Encoder};
-
-const PALETTE: [u8; 768] = *include_bytes!("palette.lmp");
 
 fn main() {
     let arguments = args();
@@ -108,10 +105,9 @@ fn write_palette(name: &str, bytes: &Palette) {
 fn pixels_to_colors(pixels: &[u8]) -> Box<[[u8; 3]]> {
     let ct = pixels.len();
     let mut colors = Box::<[[u8; 3]]>::from(vec![[0u8; 3]; ct]);
-    let palette: [[u8; 3]; 256] = unsafe { transmute(PALETTE) };
 
     for (idx, pixel) in pixels.iter().copied().enumerate() {
-        colors[idx] = palette[usize::from(pixel)];
+        colors[idx] = QUAKE_PALETTE[usize::from(pixel)];
     }
 
     colors

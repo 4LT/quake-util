@@ -3,7 +3,7 @@ use std::ffi::CString;
 use std::mem::{size_of, size_of_val, transmute};
 use std::string::{String, ToString};
 
-use crate::common::{Junk, Palette};
+use crate::{Junk, Palette};
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
 pub const PAL_LUMP_ID: u8 = 0x40;

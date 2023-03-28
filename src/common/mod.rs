@@ -1,5 +1,8 @@
 pub type Palette = [[u8; 3]; 256];
 
+pub const QUAKE_PALETTE: Palette =
+    unsafe { std::mem::transmute(*include_bytes!("palette.lmp")) };
+
 #[derive(Debug, Clone, Copy)]
 pub struct Junk<T: Copy + Default + Sized> {
     _value: T,
