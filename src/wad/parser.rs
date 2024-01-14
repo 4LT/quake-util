@@ -3,15 +3,14 @@ use crate::wad::repr::{
     Entry, Head, Image, Lump, MipTexture, MipTextureHead, FLAT_LUMP_ID,
     MIPTEX_LUMP_ID, PAL_LUMP_ID, SBAR_LUMP_ID,
 };
+use crate::wad::{ReadError, ReadResult};
 use std::boxed::Box;
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::{size_of, size_of_val, MaybeUninit};
 use std::string::{String, ToString};
 use std::vec::Vec;
 
-pub fn parse_directory(
-    mut cursor: impl Seek + Read,
-) -> Result<Vec<Entry>, String> {
+pub fn parse_directory(mut cursor: impl Seek + Read) -> ReadResult<Vec<Entry>> {
     cursor.rewind().map_err(|e| e.to_string())?;
     let mut header_bytes = [0u8; size_of::<Head>()];
     cursor
