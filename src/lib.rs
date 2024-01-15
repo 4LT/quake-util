@@ -1,5 +1,4 @@
 #![no_std]
-#![cfg_attr(feature = "std", feature(io_error_other))]
 
 #[cfg(all(not(feature = "std"), not(feature = "alloc_fills")))]
 compile_error!("Must use feature 'std' or 'alloc_fills'");
