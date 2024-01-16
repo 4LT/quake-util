@@ -2,8 +2,13 @@ use std::ffi::CString;
 
 pub type Palette = [[u8; 3]; 256];
 
-pub const QUAKE_PALETTE: Palette =
-    unsafe { std::mem::transmute(*include_bytes!("palette.lmp")) };
+pub const QUAKE_PALETTE: Palette = include_palette();
+
+const fn include_palette() -> Palette {
+    let bytes = *include_bytes!("palette.lmp");
+    assert!(bytes.len() == std::mem::size_of::<Palette>());
+    unsafe { std::mem::transmute(bytes) }
+}
 
 #[derive(Clone, Copy)]
 pub struct Junk<T: Copy + Default + Sized> {
