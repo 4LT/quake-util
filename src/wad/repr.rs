@@ -11,7 +11,7 @@ pub const SBAR_LUMP_ID: u8 = 0x42;
 pub const MIPTEX_LUMP_ID: u8 = 0x44;
 pub const FLAT_LUMP_ID: u8 = 0x45;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C, packed)]
 pub struct Head {
     magic: [u8; 4],
@@ -64,7 +64,7 @@ impl TryFrom<[u8; size_of::<Head>()]> for Head {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C, packed)]
 pub struct Entry {
     offset: u32,

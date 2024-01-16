@@ -5,7 +5,7 @@ pub type Palette = [[u8; 3]; 256];
 pub const QUAKE_PALETTE: Palette =
     unsafe { std::mem::transmute(*include_bytes!("palette.lmp")) };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Junk<T: Copy + Default + Sized> {
     _value: T,
 }
@@ -23,6 +23,15 @@ impl<T: Copy + Default> Default for Junk<T> {
         Self {
             _value: T::default(),
         }
+    }
+}
+
+impl<T: Copy + Default> core::fmt::Debug for Junk<T> {
+    fn fmt(
+        &self,
+        _formatter: &mut core::fmt::Formatter,
+    ) -> Result<(), core::fmt::Error> {
+        Ok(())
     }
 }
 
