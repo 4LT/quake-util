@@ -19,5 +19,7 @@ pub use common::{Junk, Palette, QUAKE_PALETTE};
 
 use common::slice_to_cstring;
 
+pub mod error;
+pub mod lump;
 pub mod qmap;
 pub mod wad;
