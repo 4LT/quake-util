@@ -43,7 +43,7 @@ impl Image {
         Image {
             width,
             height: pixel_ct / width,
-            pixels: pixels.into(),
+            pixels,
         }
     }
 
@@ -98,7 +98,7 @@ impl<'a> IntoIterator for &'a MipTexture {
     type IntoIter = std::slice::Iter<'a, Image>;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&self.mips[..]).into_iter()
+        self.mips[..].iter()
     }
 }
 

@@ -5,9 +5,8 @@ use std::boxed::Box;
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::{size_of, size_of_val, transmute, MaybeUninit};
 use std::string::{String, ToString};
-use std::vec::Vec;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ParseInferenceInfo<'a> {
     None,
     Entry(&'a wad::Entry),
@@ -23,8 +22,6 @@ impl ParseInferenceInfo<'_> {
         }
     }
 }
-
-impl Eq for ParseInferenceInfo<'_> {}
 
 pub fn parse_mip_texture(
     cursor: &mut (impl Seek + Read),
@@ -54,18 +51,13 @@ pub fn parse_mip_texture(
             ))
             .map_err(|e| e.to_string())?;
 
-        let mut pixels = Vec::<u8>::new();
-        pixels.resize(length as usize, 0u8);
-        let mut pixels = pixels.into_boxed_slice();
+        let mut pixels = vec![0u8; length as usize].into_boxed_slice();
         cursor.read_exact(&mut pixels).map_err(|e| e.to_string())?;
 
-        mips[i as usize]
-            .write(Image::from_pixels(head.width >> i, pixels.into()));
+        mips[i as usize].write(Image::from_pixels(head.width >> i, pixels));
     }
 
-    Ok(MipTexture::new(unsafe {
-        mips.map(|elem| elem.assume_init())
-    })?)
+    MipTexture::new(unsafe { mips.map(|elem| elem.assume_init()) })
 }
 
 pub fn parse_palette(reader: &mut impl Read) -> Result<Box<Palette>, String> {
@@ -91,9 +83,7 @@ pub fn parse_image(reader: &mut impl Read) -> Result<Image, String> {
         .checked_mul(height)
         .ok_or("Image too large".to_string())?;
 
-    let mut pixels = Vec::<u8>::new();
-    pixels.resize(pixel_ct as usize, 0u8);
-    let mut pixels = pixels.into_boxed_slice();
+    let mut pixels = vec![0u8; pixel_ct as usize].into_boxed_slice();
     reader.read_exact(&mut pixels).map_err(|e| e.to_string())?;
 
     Ok(Image::from_pixels(width, pixels))
@@ -143,7 +133,7 @@ pub fn parse_inferred(
 
         // Quake's gfx.wad has CONCHARS's type set explicitly to MIPTEX,
         // event though it's a FLAT (128x128 pixels)
-        if &entry.name()[..size_of_val(CONCHARS_NAME)] == &CONCHARS_NAME[..] {
+        if entry.name()[..size_of_val(CONCHARS_NAME)] == CONCHARS_NAME[..] {
             prioritize(kind::FLAT);
         }
     }
@@ -220,9 +210,7 @@ fn read_raw_priv(
     length: usize,
 ) -> Result<Box<[u8]>, String> {
     let offset = cursor.stream_position().map_err(|e| e.to_string())?;
-    let mut bytes = Vec::<u8>::new();
-    bytes.resize(length, 0u8);
-    let mut bytes = bytes.into_boxed_slice();
+    let mut bytes = vec![0u8; length].into_boxed_slice();
 
     cursor.read_exact(&mut bytes).map_err(|e| {
         format!("{} (offset = {}, length = {})", e, offset, length,)

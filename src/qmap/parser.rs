@@ -209,11 +209,11 @@ fn expect_byte_or(
     match token.as_ref() {
         Some(payload) if payload.match_byte(byte) => Ok(()),
         Some(payload) => {
-            let rest_str = (&rest
+            let rest_str = rest
                 .iter()
                 .copied()
                 .map(|b| format!("`{}`", char::from(b)))
-                .collect::<Vec<_>>()[..])
+                .collect::<Vec<_>>()[..]
                 .join(", ");
 
             Err(qmap::ParseError::from_parser(
