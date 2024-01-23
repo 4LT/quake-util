@@ -3,13 +3,9 @@ use std::ffi::CString;
 use std::mem::size_of;
 use std::string::{String, ToString};
 
-use crate::{slice_to_cstring, Junk};
+use crate::{lump, slice_to_cstring, Junk};
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
-pub const PAL_LUMP_ID: u8 = 0x40;
-pub const SBAR_LUMP_ID: u8 = 0x42;
-pub const MIPTEX_LUMP_ID: u8 = 0x44;
-pub const FLAT_LUMP_ID: u8 = 0x45;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C, packed)]
@@ -300,6 +296,11 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
 }
 
 fn expected_lump_kind(lump_kind: u8) -> bool {
-    [PAL_LUMP_ID, SBAR_LUMP_ID, MIPTEX_LUMP_ID, FLAT_LUMP_ID]
-        .contains(&lump_kind)
+    [
+        lump::kind::PALETTE,
+        lump::kind::SBAR,
+        lump::kind::MIPTEX,
+        lump::kind::FLAT,
+    ]
+    .contains(&lump_kind)
 }
