@@ -1,5 +1,5 @@
-use quake_util::{wad, Palette, QUAKE_PALETTE};
-use wad::Lump;
+use lump::Lump;
+use quake_util::{lump, wad, Palette, QUAKE_PALETTE};
 
 use std::env::args;
 use std::fs::{create_dir_all, File};
@@ -26,9 +26,12 @@ fn main() {
         let name = entry.name_as_cstring();
         let name = name.to_string_lossy();
 
-        let lump = wad::parse_lump(&entry, &mut reader)
-            .map_err(|e| format!("`{}`: {}", name, e))
-            .unwrap();
+        let lump = lump::parse_inferred(
+            &mut reader,
+            lump::ParseInferenceInfo::Entry(&entry),
+        )
+        .map_err(|e| format!("`{}`: {}", name, e))
+        .unwrap();
 
         match lump {
             Lump::MipTexture(tex) => {
@@ -67,6 +70,9 @@ fn main() {
                         eprintln!("Bad dimensions for \"{}\"", &name);
                     }
                 }
+            }
+            Lump::Unknown(_) => {
+                eprintln!("Unknown lump \"{}\"", &name);
             }
         }
     }

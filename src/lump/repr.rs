@@ -1,6 +1,29 @@
+use crate::lump::kind;
+use crate::Palette;
 use std::boxed::Box;
 use std::mem::size_of;
 use std::string::{String, ToString};
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Lump {
+    Palette(Box<Palette>),
+    StatusBar(Image),
+    MipTexture(MipTexture),
+    Flat(Box<[u8]>),
+    Unknown(Box<[u8]>),
+}
+
+impl Lump {
+    pub fn kind(&self) -> Option<u8> {
+        match self {
+            Self::Palette(_) => Some(kind::PALETTE),
+            Self::StatusBar(_) => Some(kind::SBAR),
+            Self::MipTexture(_) => Some(kind::MIPTEX),
+            Self::Flat(_) => Some(kind::FLAT),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Image {

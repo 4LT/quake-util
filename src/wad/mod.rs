@@ -1,12 +1,15 @@
 mod repr;
 
 #[cfg(feature = "std")]
-pub mod read;
+mod parse;
+
+#[cfg(feature = "std")]
+pub use parse::parse_directory;
 
 #[cfg(feature = "std")]
 mod result;
 
-pub use repr::{Entry, Lump};
+pub use repr::Entry;
 
 #[cfg(feature = "std")]
 pub use result::{ReadError, ReadResult};

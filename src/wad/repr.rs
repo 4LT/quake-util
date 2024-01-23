@@ -3,7 +3,7 @@ use std::ffi::CString;
 use std::mem::size_of;
 use std::string::{String, ToString};
 
-use crate::{slice_to_cstring, Junk, Palette};
+use crate::{slice_to_cstring, Junk};
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
 pub const PAL_LUMP_ID: u8 = 0x40;
@@ -105,7 +105,7 @@ impl Entry {
         self.length
     }
 
-    pub fn lump_kind(&self) -> u8 {
+    pub fn kind(&self) -> u8 {
         self.lump_kind
     }
 }
@@ -162,25 +162,6 @@ pub struct EntryConfig {
     length: u32,
     lump_kind: u8,
     name: [u8; 16],
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Lump {
-    Palette(Box<Palette>),
-    StatusBar(Image),
-    MipTexture(MipTexture),
-    Flat(Box<[u8]>),
-}
-
-impl Lump {
-    pub fn kind(&self) -> u8 {
-        match self {
-            Self::Palette(_) => PAL_LUMP_ID,
-            Self::StatusBar(_) => PAL_LUMP_ID,
-            Self::MipTexture(_) => PAL_LUMP_ID,
-            Self::Flat(_) => PAL_LUMP_ID,
-        }
-    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
