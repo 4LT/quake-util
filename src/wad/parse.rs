@@ -5,7 +5,9 @@ use std::io;
 use std::mem::size_of;
 use std::vec::Vec;
 
-pub fn parse_directory(mut cursor: impl Seek + Read) -> ReadResult<Vec<Entry>> {
+pub fn parse_directory(
+    cursor: &mut (impl Seek + Read),
+) -> ReadResult<Vec<Entry>> {
     let wad_start = cursor.stream_position().map_err(ReadError::Io)?;
 
     let mut header_bytes = [0u8; size_of::<Head>()];
