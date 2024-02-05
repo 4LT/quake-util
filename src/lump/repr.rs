@@ -1,8 +1,10 @@
+use crate::error;
 use crate::lump::kind;
 use crate::Palette;
+use error::BinParseResult;
 use std::boxed::Box;
 use std::mem::size_of;
-use std::string::{String, ToString};
+use std::string::ToString;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Lump {
@@ -68,16 +70,17 @@ pub struct MipTexture {
 impl MipTexture {
     pub const LEN: usize = 4;
 
-    pub fn new(mips: [Image; Self::LEN]) -> Result<Self, String> {
+    pub fn new(mips: [Image; Self::LEN]) -> BinParseResult<Self> {
         for l in 0..(Self::LEN - 1) {
             let r = l + 1;
+            let err = || Err(error::BinParse::Parse("Bad mipmaps".to_string()));
 
             if Some(mips[l].width) != mips[r].width.checked_mul(2) {
-                return Err("Bad mipmaps".to_string());
+                return err();
             }
 
             if Some(mips[l].height) != mips[r].height.checked_mul(2) {
-                return Err("Bad mipmaps".to_string());
+                return err();
             }
         }
 
@@ -112,7 +115,7 @@ pub struct MipTextureHead {
 }
 
 impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
-    type Error = String;
+    type Error = error::BinParse;
 
     fn try_from(
         bytes: [u8; size_of::<MipTextureHead>()],
@@ -130,16 +133,22 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
             u32::from_le_bytes(<[u8; 4]>::try_from(&bytes[..4]).unwrap());
 
         if width % 8 != 0 {
-            return Err(format!("Invalid width {}", width));
+            return Err(error::BinParse::Parse(format!(
+                "Invalid width {}",
+                width
+            )));
         }
 
         if height % 8 != 0 {
-            return Err(format!("Invalid height {}", height));
+            return Err(error::BinParse::Parse(format!(
+                "Invalid height {}",
+                height
+            )));
         }
 
         width
             .checked_mul(height)
-            .ok_or("Texture too large".to_string())?;
+            .ok_or(error::BinParse::Parse("Texture too large".to_string()))?;
 
         let bytes = &bytes[4..];
 

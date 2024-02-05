@@ -2,8 +2,7 @@ mod parse;
 mod repr;
 
 pub use parse::{
-    parse_image, parse_inferred, parse_mip_texture, parse_palette, read_raw,
-    seek_to_entry, ParseInferenceInfo,
+    parse_image, parse_mip_texture, parse_palette, read_raw, ParseInferenceInfo,
 };
 
 pub use repr::{Image, Lump, MipTexture, MipTextureHead};

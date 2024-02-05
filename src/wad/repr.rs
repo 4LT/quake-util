@@ -1,8 +1,9 @@
-use std::ffi::CString;
+use std::ffi::{CString, IntoStringError};
 use std::mem::size_of;
 use std::string::{String, ToString};
 
-use crate::{lump, slice_to_cstring, Junk};
+use crate::common::Junk;
+use crate::{lump, slice_to_cstring};
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
 
@@ -84,8 +85,12 @@ impl Entry {
         }
     }
 
-    pub fn name_as_cstring(&self) -> CString {
+    pub fn name_to_cstring(&self) -> CString {
         slice_to_cstring(&self.name)
+    }
+
+    pub fn name_to_string(&self) -> Result<String, IntoStringError> {
+        self.name_to_cstring().into_string()
     }
 
     pub fn name(&self) -> [u8; 16] {

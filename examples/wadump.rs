@@ -20,18 +20,17 @@ fn main() {
     let file = File::open(wad_path).expect("Could not open file");
     let mut reader = BufReader::new(file);
 
-    let entries = wad::parse_directory(&mut reader).unwrap();
+    let (mut parser, warnings) = wad::Parser::new(&mut reader).unwrap();
 
-    for entry in entries {
-        let name = entry.name_as_cstring();
-        let name = name.to_string_lossy();
+    for warning in warnings {
+        eprintln!("Warning: {warning}");
+    }
 
-        let lump = lump::parse_inferred(
-            &mut reader,
-            lump::ParseInferenceInfo::Entry(&entry),
-        )
-        .map_err(|e| format!("`{}`: {}", name, e))
-        .unwrap();
+    for (name, entry) in parser.directory() {
+        let lump = parser
+            .parse_inferred(&entry)
+            .map_err(|e| format!("`{}`: {}", name, e))
+            .unwrap();
 
         match lump {
             Lump::MipTexture(tex) => {

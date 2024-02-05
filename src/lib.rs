@@ -15,7 +15,7 @@ extern crate alloc;
 
 mod common;
 
-pub use common::{Junk, Palette, QUAKE_PALETTE};
+pub use common::{Palette, QUAKE_PALETTE};
 
 use common::slice_to_cstring;
 
