@@ -2,7 +2,7 @@
 extern crate std;
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     convert::TryInto,
     fmt, io,
     num::{NonZeroU64, NonZeroU8},
@@ -10,8 +10,9 @@ use std::{
     vec::Vec,
 };
 
-use crate::qmap;
-use qmap::{ParseError, ParseResult};
+use crate::error;
+
+pub type LexResult = Result<Option<Token>, Cell<Option<error::TextParse>>>;
 
 const TEXT_CAPACITY: usize = 32;
 
@@ -46,6 +47,7 @@ impl fmt::Display for Token {
     }
 }
 
+#[derive(Debug)]
 pub struct TokenIterator<R: io::Read> {
     text: RefCell<Option<Vec<NonZeroU8>>>,
     state: fn(iter: &mut TokenIterator<R>) -> Option<Token>,
@@ -67,12 +69,20 @@ impl<R: io::Read> TokenIterator<R> {
         }
     }
 
-    fn byte_read(&mut self, b: io::Result<u8>) -> ParseResult<Option<Token>> {
-        let byte = b.map_err(ParseError::from_io)?;
+    fn byte_read(&mut self, b: io::Result<u8>) -> LexResult {
+        let byte = b.map_err(|e| Cell::new(Some(e.into())))?;
 
-        self.byte = Some(byte.try_into().map_err(|_| {
-            ParseError::from_lexer(String::from("Null byte"), self.line_number)
-        })?);
+        self.byte = Some(
+            byte.try_into()
+                .map_err(|_| {
+                    error::TextParse::from_lexer(
+                        String::from("Null byte"),
+                        self.line_number,
+                    )
+                })
+                .map_err(Some)
+                .map_err(Cell::new)?,
+        );
 
         let maybe_token = (self.state)(self);
 
@@ -90,16 +100,16 @@ impl<R: io::Read> TokenIterator<R> {
         Ok(maybe_token)
     }
 
-    fn eof_read(&mut self) -> ParseResult<Option<Token>> {
+    fn eof_read(&mut self) -> LexResult {
         if let Some(last_text) = self.text.replace(None) {
             if last_text[0] == NonZeroU8::new(b'"').unwrap()
                 && (last_text.last() != NonZeroU8::new(b'"').as_ref()
                     || last_text.len() == 1)
             {
-                Err(ParseError::from_lexer(
+                Err(Cell::new(Some(error::TextParse::from_lexer(
                     String::from("Missing closing quote"),
                     self.line_number,
-                ))
+                ))))
             } else {
                 Ok(Some(Token {
                     text: last_text,
@@ -113,9 +123,9 @@ impl<R: io::Read> TokenIterator<R> {
 }
 
 impl<R: io::Read> Iterator for TokenIterator<R> {
-    type Item = ParseResult<Token>;
+    type Item = Result<Token, Cell<Option<error::TextParse>>>;
 
-    fn next(&mut self) -> Option<ParseResult<Token>> {
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some(b) = self.input.next() {
                 if let token @ Some(_) = self.byte_read(b).transpose() {

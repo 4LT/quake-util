@@ -13,13 +13,22 @@ extern crate std;
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+#[cfg(feature = "std")]
 mod common;
 
+#[cfg(feature = "std")]
 pub use common::{Palette, QUAKE_PALETTE};
 
+#[cfg(feature = "std")]
 use common::slice_to_cstring;
 
+#[cfg(feature = "std")]
 pub mod error;
+
+#[cfg(feature = "std")]
 pub mod lump;
-pub mod qmap;
+
+#[cfg(feature = "std")]
 pub mod wad;
+
+pub mod qmap;

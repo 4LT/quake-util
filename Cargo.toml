@@ -13,8 +13,8 @@ alloc_fills = ["hashbrown"]
 std = []
 
 [dependencies]
-hashbrown = { version = "^0.12", optional = true }
+hashbrown = { version = "^0.14", optional = true }
 
 [dev-dependencies]
 benchmarking = "^0.4"
-png = "^0.17.7"
+png = "^0.17"

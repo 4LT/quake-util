@@ -1,5 +1,9 @@
 use std::ffi::CString;
 
+mod ext_traits;
+
+pub use ext_traits::CellOptionExt;
+
 pub type Palette = [[u8; 3]; 256];
 
 pub const QUAKE_PALETTE: Palette = include_palette();

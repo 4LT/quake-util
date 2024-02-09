@@ -1,6 +1,6 @@
-use crate::qmap;
+use crate::{error, qmap};
 use qmap::parser::parse;
-use qmap::{EntityKind, ParseError};
+use qmap::EntityKind;
 use std::ffi::CString;
 use std::io;
 
@@ -194,7 +194,7 @@ fn parse_weird_textures() {
 #[test]
 fn parse_token_error() {
     let err = parse(&b"\""[..]).err().unwrap();
-    if let ParseError::Lexer(line_err) = err {
+    if let error::TextParse::Lexer(line_err) = err {
         assert_eq!(u64::from(line_err.line_number.unwrap()), 1u64);
     } else {
         panic_unexpected_variant(err);
@@ -205,7 +205,7 @@ fn parse_token_error() {
 fn parse_io_error() {
     let reader = ErroringReader::new();
     let err = parse(reader).err().unwrap();
-    if let ParseError::Io(_) = err {
+    if let error::TextParse::Io(_) = err {
     } else {
         panic_unexpected_variant(err);
     }
@@ -214,7 +214,7 @@ fn parse_io_error() {
 #[test]
 fn parse_eof_error() {
     let err = parse(&b"{"[..]).err().unwrap();
-    if let ParseError::Parser(line_err) = err {
+    if let error::TextParse::Parser(line_err) = err {
         assert_eq!(line_err.line_number, None);
         assert!(line_err.message.contains("end-of-file"));
     } else {
@@ -225,7 +225,7 @@ fn parse_eof_error() {
 #[test]
 fn parse_closing_brace_error() {
     let err = parse(&b"}"[..]).err().unwrap();
-    if let ParseError::Parser(line_err) = err {
+    if let error::TextParse::Parser(line_err) = err {
         assert_eq!(u64::from(line_err.line_number.unwrap()), 1u64);
         assert!(line_err.message.contains('}'));
     } else {
@@ -236,7 +236,7 @@ fn parse_closing_brace_error() {
 #[test]
 fn parse_missing_value() {
     let err = parse(&b"{\n \"classname\"\n }"[..]).err().unwrap();
-    if let ParseError::Parser(line_err) = err {
+    if let error::TextParse::Parser(line_err) = err {
         assert_eq!(u64::from(line_err.line_number.unwrap()), 3u64);
         assert!(line_err.message.contains('}'));
     } else {
@@ -252,7 +252,7 @@ fn parse_bad_texture_name() {
             } }
         "#;
     let err = parse(&map_text[..]).err().unwrap();
-    if let ParseError::Parser(line_err) = err {
+    if let error::TextParse::Parser(line_err) = err {
         assert!(line_err.message.contains("tex\""));
     } else {
         panic_unexpected_variant(err);
@@ -269,7 +269,7 @@ fn parse_unclosed_surface() {
         {
     "#;
     let err = parse(&map_text[..]).err().unwrap();
-    if let ParseError::Parser(line_err) = err {
+    if let error::TextParse::Parser(line_err) = err {
         let (pfx, _) = line_err.message.split_once("got").unwrap();
         assert!(pfx.contains("`}`"));
         assert!(pfx.contains("`(`"));
