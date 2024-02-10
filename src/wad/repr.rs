@@ -3,7 +3,7 @@ use std::mem::size_of;
 use std::string::{String, ToString};
 
 use crate::common::Junk;
-use crate::{lump, slice_to_cstring};
+use crate::{error, slice_to_cstring};
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
 
@@ -34,7 +34,7 @@ impl Head {
 }
 
 impl TryFrom<[u8; size_of::<Head>()]> for Head {
-    type Error = String;
+    type Error = error::BinParse;
 
     fn try_from(bytes: [u8; size_of::<Head>()]) -> Result<Self, Self::Error> {
         let mut chunks = bytes.chunks_exact(4usize);
@@ -43,17 +43,17 @@ impl TryFrom<[u8; size_of::<Head>()]> for Head {
             let magic_str: String =
                 MAGIC.iter().copied().map(char::from).collect();
 
-            return Err(format!("Magic number does not match `{magic_str}`"));
+            return Err(error::BinParse::Parse(format!(
+                "Magic number does not match `{magic_str}`"
+            )));
         }
 
         let entry_count = u32::from_le_bytes(
-            <[u8; 4]>::try_from(chunks.next().unwrap())
-                .map_err(|e| e.to_string())?,
+            <[u8; 4]>::try_from(chunks.next().unwrap()).unwrap(),
         );
 
         let directory_offset = u32::from_le_bytes(
-            <[u8; 4]>::try_from(chunks.next().unwrap())
-                .map_err(|e| e.to_string())?,
+            <[u8; 4]>::try_from(chunks.next().unwrap()).unwrap(),
         );
 
         Ok(Head::new(entry_count, directory_offset))
@@ -111,7 +111,7 @@ impl Entry {
 }
 
 impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
-    type Error = String;
+    type Error = error::BinParse;
 
     fn try_from(bytes: [u8; size_of::<Entry>()]) -> Result<Self, Self::Error> {
         let (offset_bytes, rest) = bytes.split_at(4);
@@ -138,11 +138,9 @@ impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
         };
 
         if compression != 0 {
-            return Err("Compression is unsupported".to_string());
-        }
-
-        if !expected_lump_kind(lump_kind) {
-            return Err(format!("Unexpected lump type `{lump_kind}`"));
+            return Err(error::BinParse::Parse(
+                "Compression is unsupported".to_string(),
+            ));
         }
 
         let name: [u8; 16] = rest[2..].try_into().unwrap();
@@ -158,18 +156,8 @@ impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryConfig {
-    offset: u32,
-    length: u32,
-    lump_kind: u8,
-    name: [u8; 16],
-}
-
-fn expected_lump_kind(lump_kind: u8) -> bool {
-    [
-        lump::kind::PALETTE,
-        lump::kind::SBAR,
-        lump::kind::MIPTEX,
-        lump::kind::FLAT,
-    ]
-    .contains(&lump_kind)
+    pub offset: u32,
+    pub length: u32,
+    pub lump_kind: u8,
+    pub name: [u8; 16],
 }

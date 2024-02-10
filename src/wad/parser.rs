@@ -169,8 +169,7 @@ fn parse_directory(
 ) -> BinParseResult<(HashMap<String, wad::Entry>, Vec<String>)> {
     let mut header_bytes = [0u8; size_of::<Head>()];
     cursor.read_exact(&mut header_bytes[..])?;
-    let header: Head =
-        header_bytes.try_into().map_err(error::BinParse::Parse)?;
+    let header: Head = header_bytes.try_into()?;
     let entry_ct = header.entry_count();
     let dir_offset = header.directory_offset();
 
@@ -192,8 +191,7 @@ fn parse_directory(
         const WAD_ENTRY_SIZE: usize = size_of::<wad::Entry>();
         let mut entry_bytes = [0u8; WAD_ENTRY_SIZE];
         cursor.read_exact(&mut entry_bytes[0..WAD_ENTRY_SIZE])?;
-        let entry: wad::Entry =
-            entry_bytes.try_into().map_err(error::BinParse::Parse)?;
+        let entry: wad::Entry = entry_bytes.try_into()?;
 
         let entry_name = entry
             .name_to_string()
