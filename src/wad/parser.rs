@@ -123,33 +123,47 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
             prioritize(lump::kind::FLAT);
         }
 
+        let mut last_error = error::BinParse::Parse("Unreachable".to_string());
+
         for attempt_kind in attempt_order {
             match attempt_kind {
-                lump::kind::MIPTEX => {
-                    if let Ok(miptex) = self.parse_mip_texture(entry) {
+                lump::kind::MIPTEX => match self.parse_mip_texture(entry) {
+                    Ok(miptex) => {
                         return Ok(Lump::MipTexture(miptex));
                     }
-                }
-                lump::kind::SBAR => {
-                    if let Ok(img) = self.parse_image(entry) {
+                    Err(e) => {
+                        last_error = e;
+                    }
+                },
+                lump::kind::SBAR => match self.parse_image(entry) {
+                    Ok(img) => {
                         return Ok(Lump::StatusBar(img));
                     }
-                }
-                lump::kind::PALETTE => {
-                    if let Ok(pal) = self.parse_palette(entry) {
+                    Err(e) => {
+                        last_error = e;
+                    }
+                },
+                lump::kind::PALETTE => match self.parse_palette(entry) {
+                    Ok(pal) => {
                         return Ok(Lump::Palette(pal));
                     }
-                }
-                lump::kind::FLAT => {
-                    if let Ok(bytes) = self.read_raw(entry) {
+                    Err(e) => {
+                        last_error = e;
+                    }
+                },
+                lump::kind::FLAT => match self.read_raw(entry) {
+                    Ok(bytes) => {
                         return Ok(Lump::Flat(bytes));
                     }
-                }
+                    Err(e) => {
+                        last_error = e;
+                    }
+                },
                 _ => unreachable!(),
             }
         }
 
-        Err(error::BinParse::Parse("Failed to parse lump".to_string()))
+        Err(last_error)
     }
 
     fn seek_to_entry(&mut self, entry: &wad::Entry) -> BinParseResult<()> {

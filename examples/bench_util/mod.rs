@@ -50,7 +50,7 @@ pub fn download_file(filename: &str, out_path: &str) -> Result<(), String> {
 pub fn prepare_file(filename: &str) -> Result<String, String> {
     let hash_path = format!("{LARGE_FILE_HASH_PATH}/{filename}.{HASH_SUFFIX}");
     let file_path = format!("{LARGE_FILE_PATH}/{filename}");
-    let expected_hash = strip_hash(read_to_string(&hash_path).as_deref())?;
+    let expected_hash = strip_hash(read_to_string(hash_path).as_deref())?;
     let file_res = File::open(&file_path);
     let _ = create_dir_all(LARGE_FILE_PATH);
 

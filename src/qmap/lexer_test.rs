@@ -31,7 +31,7 @@ fn lex_all_symbols() {
     let input = b" // a comment  \n { } x \"\"\t\" \"\n-1.23e4 {k \r\n q\"";
     let iter = TokenIterator::new(&input[..]);
 
-    let expected = vec![
+    let expected = [
         (&b"{"[..], 2u64),
         (&b"}"[..], 2u64),
         (&b"x"[..], 2u64),

@@ -9,9 +9,9 @@ use std::path::PathBuf;
 use png::{ColorType, Encoder};
 
 fn main() {
-    let arguments = args();
+    let mut arguments = args();
 
-    let wad_path = if let Some(wad_path) = arguments.skip(1).next() {
+    let wad_path = if let Some(wad_path) = arguments.nth(1) {
         wad_path
     } else {
         panic!("No arguments");
@@ -102,7 +102,7 @@ fn write_png(name: &str, width: u32, pixels: &[u8]) {
 fn write_palette(name: &str, bytes: &Palette) {
     let mut writer = new_writer(&format!("{}.lmp", name));
     writer
-        .write(&bytes.iter().flatten().copied().collect::<Vec<u8>>())
+        .write_all(&bytes.iter().flatten().copied().collect::<Vec<u8>>())
         .unwrap();
 }
 

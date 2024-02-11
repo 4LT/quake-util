@@ -33,7 +33,7 @@ mod main {
     }
 
     pub fn run_benches() {
-        let map_names = vec!["ad_heresp2.map", "standard.map"];
+        let map_names = ["ad_heresp2.map", "standard.map"];
         let maps = map_names
             .iter()
             .map(|&m| (m, prepare_file(m).unwrap()))

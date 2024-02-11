@@ -55,7 +55,7 @@ fn construct_entry() {
         name: expected_name,
     };
 
-    let entry = Entry::new(config);
+    let entry = Entry::from_config(config);
 
     assert_eq!(entry.name(), expected_name);
     assert_eq!(entry.offset(), expected_offset);

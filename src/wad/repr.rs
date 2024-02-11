@@ -73,7 +73,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(config: EntryConfig) -> Entry {
+    pub(crate) fn from_config(config: EntryConfig) -> Entry {
         Entry {
             offset: config.offset,
             length: config.length,
@@ -145,7 +145,7 @@ impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
 
         let name: [u8; 16] = rest[2..].try_into().unwrap();
 
-        Ok(Entry::new(EntryConfig {
+        Ok(Entry::from_config(EntryConfig {
             offset,
             length,
             lump_kind,
@@ -155,7 +155,7 @@ impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EntryConfig {
+pub(crate) struct EntryConfig {
     pub offset: u32,
     pub length: u32,
     pub lump_kind: u8,

@@ -5,9 +5,9 @@ use std::fs::File;
 use std::io::BufReader;
 
 fn main() {
-    let arguments = args();
+    let mut arguments = args();
 
-    let arg1 = if let Some(arg1) = arguments.skip(1).next() {
+    let arg1 = if let Some(arg1) = arguments.nth(1) {
         arg1
     } else {
         panic!("No arguments");
