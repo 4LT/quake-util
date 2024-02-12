@@ -1,7 +1,6 @@
 use crate::error;
 use crate::lump::kind;
 use crate::Palette;
-use error::BinParseResult;
 use std::boxed::Box;
 use std::mem::size_of;
 use std::string::ToString;
@@ -12,17 +11,15 @@ pub enum Lump {
     StatusBar(Image),
     MipTexture(MipTexture),
     Flat(Box<[u8]>),
-    Unknown(Box<[u8]>),
 }
 
 impl Lump {
-    pub fn kind(&self) -> Option<u8> {
+    pub fn kind(&self) -> u8 {
         match self {
-            Self::Palette(_) => Some(kind::PALETTE),
-            Self::StatusBar(_) => Some(kind::SBAR),
-            Self::MipTexture(_) => Some(kind::MIPTEX),
-            Self::Flat(_) => Some(kind::FLAT),
-            _ => None,
+            Self::Palette(_) => kind::PALETTE,
+            Self::StatusBar(_) => kind::SBAR,
+            Self::MipTexture(_) => kind::MIPTEX,
+            _ => kind::FLAT,
         }
     }
 }
@@ -38,8 +35,20 @@ impl Image {
     pub fn from_pixels(width: u32, pixels: Box<[u8]>) -> Self {
         let pixel_ct: u32 = pixels.len().try_into().expect("Too many pixels");
 
+        if pixels.len() == 0 {
+            return Image {
+                width: 0,
+                height: 0,
+                pixels,
+            };
+        }
+
+        if width == 0 {
+            panic!("Image with pixels must have width > 0");
+        }
+
         if pixel_ct % width != 0 {
-            panic!("Pixel count != width * height");
+            panic!("Incomplete pixel row");
         }
 
         Image {
@@ -70,21 +79,20 @@ pub struct MipTexture {
 impl MipTexture {
     pub const LEN: usize = 4;
 
-    pub fn new(mips: [Image; Self::LEN]) -> BinParseResult<Self> {
+    pub fn new(mips: [Image; Self::LEN]) -> Self {
         for l in 0..(Self::LEN - 1) {
             let r = l + 1;
-            let err = || Err(error::BinParse::Parse("Bad mipmaps".to_string()));
 
             if Some(mips[l].width) != mips[r].width.checked_mul(2) {
-                return err();
+                panic!("Bad mipmaps");
             }
 
             if Some(mips[l].height) != mips[r].height.checked_mul(2) {
-                return err();
+                panic!("Bad mipmaps");
             }
         }
 
-        Ok(MipTexture { mips })
+        MipTexture { mips }
     }
 
     pub fn mip(&self, index: usize) -> &Image {

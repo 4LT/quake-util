@@ -54,13 +54,8 @@ fn main() {
                     img.pixels().len(),
                 );
             }
-            lmp @ (lump::Lump::Flat(bytes) | lump::Lump::Unknown(bytes)) => {
-                if let lump::Lump::Flat(_) = lmp {
-                    println!("Flat");
-                } else {
-                    println!("Unknown");
-                }
-
+            lump::Lump::Flat(bytes) => {
+                println!("Flat");
                 println!("\t{} bytes", bytes.len());
             }
         }

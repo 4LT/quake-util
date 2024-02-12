@@ -70,9 +70,6 @@ fn main() {
                     }
                 }
             }
-            Lump::Unknown(_) => {
-                eprintln!("Unknown lump \"{}\"", &name);
-            }
         }
     }
 }

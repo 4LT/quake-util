@@ -1,29 +1,11 @@
 use crate::common::Palette;
 use crate::error;
 use crate::lump::{Image, MipTexture, MipTextureHead};
-use crate::wad;
 use error::BinParseResult;
 use std::boxed::Box;
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::{size_of, transmute, MaybeUninit};
 use std::string::ToString;
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum ParseInferenceInfo<'a> {
-    None,
-    Entry(&'a wad::Entry),
-    Length(u32),
-}
-
-impl ParseInferenceInfo<'_> {
-    pub fn length(&self) -> Option<u32> {
-        match self {
-            ParseInferenceInfo::None => None,
-            ParseInferenceInfo::Entry(entry) => Some(entry.length()),
-            ParseInferenceInfo::Length(length) => Some(*length),
-        }
-    }
-}
 
 pub fn parse_mip_texture(
     cursor: &mut (impl Seek + Read),
@@ -55,7 +37,9 @@ pub fn parse_mip_texture(
         mips[i as usize].write(Image::from_pixels(head.width >> i, pixels));
     }
 
-    MipTexture::new(unsafe { mips.map(|elem| elem.assume_init()) })
+    Ok(MipTexture::new(unsafe {
+        mips.map(|elem| elem.assume_init())
+    }))
 }
 
 pub fn parse_palette(reader: &mut impl Read) -> BinParseResult<Box<Palette>> {
@@ -82,10 +66,10 @@ pub fn parse_image(reader: &mut impl Read) -> BinParseResult<Image> {
 }
 
 pub fn read_raw(
-    cursor: &mut (impl Seek + Read),
+    reader: &mut impl Read,
     length: usize,
 ) -> BinParseResult<Box<[u8]>> {
     let mut bytes = vec![0u8; length].into_boxed_slice();
-    cursor.read_exact(&mut bytes)?;
+    reader.read_exact(&mut bytes)?;
     Ok(bytes)
 }

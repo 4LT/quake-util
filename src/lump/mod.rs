@@ -1,9 +1,7 @@
 mod parse;
 mod repr;
 
-pub use parse::{
-    parse_image, parse_mip_texture, parse_palette, read_raw, ParseInferenceInfo,
-};
+pub use parse::{parse_image, parse_mip_texture, parse_palette, read_raw};
 
 pub use repr::{Image, Lump, MipTexture, MipTextureHead};
 
@@ -13,3 +11,9 @@ pub mod kind {
     pub const MIPTEX: u8 = 0x44;
     pub const FLAT: u8 = 0x45;
 }
+
+#[cfg(test)]
+mod parse_test;
+
+#[cfg(test)]
+mod repr_test;
