@@ -44,7 +44,7 @@ const MIN_BRUSH_SURFACES: usize = 4;
 /// `brushDef`s/`patchDef`s are not presently supported) but may have texture
 /// alignment in either "Valve220" format or the "legacy" predecessor (i.e.
 /// without texture axes)
-pub fn parse<R: Read>(reader: R) -> error::TextParseResult<QuakeMap> {
+pub fn parse<R: Read>(reader: &mut R) -> error::TextParseResult<QuakeMap> {
     let mut entities: Vec<Entity> = Vec::new();
     let mut peekable_tokens = TokenIterator::new(reader).peekable();
 
