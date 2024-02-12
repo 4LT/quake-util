@@ -10,8 +10,7 @@ use std::string::ToString;
 pub fn parse_mip_texture(
     cursor: &mut (impl Seek + Read),
 ) -> BinParseResult<MipTexture> {
-    const LUMP_SIZE: usize = size_of::<MipTextureHead>();
-    let mut head_bytes = [0u8; LUMP_SIZE];
+    let mut head_bytes = [0u8; size_of::<MipTextureHead>()];
     let lump_start = cursor.stream_position()?;
 
     cursor.read_exact(&mut head_bytes)?;
