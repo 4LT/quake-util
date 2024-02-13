@@ -10,7 +10,7 @@
 //! # fn main() -> Result<(), String> {
 //! #   #[cfg(feature="std")]
 //! #   {
-//! #       let source = &b"
+//! #       let mut source = &b"
 //! #           {
 //! #           }
 //! #           "[..];
@@ -21,7 +21,7 @@
 //! use qmap::{Entity, WriteError};
 //! use quake_util::error::TextParse as TextParseError;
 //!
-//! let mut map = qmap::parse(source).map_err(|err| match err {
+//! let mut map = qmap::parse(&mut source).map_err(|err| match err {
 //!     TextParseError::Io(_) => String::from("Failed to read map"),
 //!     l_err@TextParseError::Lexer(_) => l_err.to_string(),
 //!     p_err@TextParseError::Parser(_) => p_err.to_string(),
