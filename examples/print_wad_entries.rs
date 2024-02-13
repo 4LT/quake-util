@@ -1,9 +1,10 @@
-use quake_util::lump;
-use quake_util::wad;
-use std::env::args;
-use std::fs::File;
-use std::io::BufReader;
+#[cfg(feature = "std")]
+use quake_util::{lump, wad};
 
+#[cfg(feature = "std")]
+use std::{env::args, fs::File, io::BufReader};
+
+#[cfg(feature = "std")]
 fn main() {
     let mut arguments = args();
 
@@ -61,3 +62,6 @@ fn main() {
         }
     }
 }
+
+#[cfg(not(feature = "std"))]
+fn main() {}
