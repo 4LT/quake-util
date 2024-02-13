@@ -1,6 +1,6 @@
 [package]
 name = "quake-util"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Seth <rader.seth@gmail.com>"]
 edition = "2021"
 description = "A utility library for using Quake file formats"
@@ -13,7 +13,8 @@ alloc_fills = ["hashbrown"]
 std = []
 
 [dependencies]
-hashbrown = { version = "^0.12", optional = true }
+hashbrown = { version = "^0.14", optional = true }
 
 [dev-dependencies]
 benchmarking = "^0.4"
+png = "^0.17"

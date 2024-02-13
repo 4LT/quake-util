@@ -15,8 +15,8 @@ mod main {
 
     fn parse_file(file_path: &str) {
         let f = File::open(file_path).unwrap();
-        let reader = BufReader::new(f);
-        let _ = parse(reader).unwrap();
+        let mut reader = BufReader::new(f);
+        let _ = parse(&mut reader).unwrap();
     }
 
     fn measure_parse(path: &str) -> Duration {
@@ -33,7 +33,7 @@ mod main {
     }
 
     pub fn run_benches() {
-        let map_names = vec!["ad_heresp2.map", "standard.map"];
+        let map_names = ["ad_heresp2.map", "standard.map"];
         let maps = map_names
             .iter()
             .map(|&m| (m, prepare_file(m).unwrap()))

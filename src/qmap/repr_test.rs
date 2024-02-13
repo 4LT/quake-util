@@ -149,7 +149,7 @@ fn check_simple_map() {
 
 #[test]
 fn check_bad_map() {
-    assert!(matches!(bad_map_edict().check_writable(), Err(_)));
+    assert!(bad_map_edict().check_writable().is_err());
 }
 
 #[test]
@@ -166,9 +166,7 @@ fn check_bad_entities() {
         .into_iter()
         .chain(good_edict_strings.clone());
 
-    let value_iter = good_edict_strings
-        .clone()
-        .chain(bad_edict_strings.into_iter());
+    let value_iter = good_edict_strings.chain(bad_edict_strings);
 
     let trials = bad_char_iter.zip(key_iter.zip(value_iter));
 
@@ -188,10 +186,9 @@ fn check_bad_entities() {
 
 #[test]
 fn check_bad_surface_texture() {
-    assert!(matches!(
-        entity_with_texture(&CString::new("\"").unwrap()).check_writable(),
-        Err(_)
-    ));
+    assert!(entity_with_texture(&CString::new("\"").unwrap())
+        .check_writable()
+        .is_err(),);
 }
 
 #[test]
@@ -213,7 +210,7 @@ fn check_bad_surface_alignment() {
         alignment: BAD_ALIGNMENT_ROTATION,
     };
 
-    assert!(matches!(surf.check_writable(), Err(_)));
+    assert!(surf.check_writable().is_err());
 }
 
 #[test]

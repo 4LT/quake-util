@@ -1,14 +1,41 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-use std::{io::Read, iter::Peekable, num::NonZeroU8, str::FromStr, vec::Vec};
+use std::{
+    cell::Cell, io::Read, iter::Peekable, num::NonZeroU8, str::FromStr,
+    vec::Vec,
+};
 
-use crate::qmap;
+use crate::{common, error, qmap};
+use common::CellOptionExt;
 use qmap::lexer::{Token, TokenIterator};
 use qmap::repr::{Alignment, Brush, Edict, Entity, Point, QuakeMap, Surface};
-use qmap::ParseResult;
 
 type TokenPeekable<R> = Peekable<TokenIterator<R>>;
+
+trait Extract {
+    fn extract(&mut self) -> Result<Option<Token>, error::TextParse>;
+}
+
+impl<R> Extract for TokenPeekable<R>
+where
+    R: Read,
+{
+    fn extract(&mut self) -> Result<Option<Token>, error::TextParse> {
+        self.next().transpose().map_err(|e| e.into_unwrapped())
+    }
+}
+
+trait Normalize {
+    fn normalize(&self) -> Result<&Option<Token>, error::TextParse>;
+}
+
+impl Normalize for Result<Option<Token>, Cell<Option<error::TextParse>>> {
+    fn normalize(&self) -> Result<&Option<Token>, error::TextParse> {
+        self.as_ref().map_err(|e| e.steal())
+    }
+}
+
 const MIN_BRUSH_SURFACES: usize = 4;
 
 /// Parses a Quake source map
@@ -17,7 +44,7 @@ const MIN_BRUSH_SURFACES: usize = 4;
 /// `brushDef`s/`patchDef`s are not presently supported) but may have texture
 /// alignment in either "Valve220" format or the "legacy" predecessor (i.e.
 /// without texture axes)
-pub fn parse<R: Read>(reader: R) -> ParseResult<QuakeMap> {
+pub fn parse<R: Read>(reader: &mut R) -> error::TextParseResult<QuakeMap> {
     let mut entities: Vec<Entity> = Vec::new();
     let mut peekable_tokens = TokenIterator::new(reader).peekable();
 
@@ -29,26 +56,34 @@ pub fn parse<R: Read>(reader: R) -> ParseResult<QuakeMap> {
     Ok(QuakeMap { entities })
 }
 
-fn parse_entity<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Entity> {
-    expect_byte(&tokens.next().transpose()?, b'{')?;
+fn parse_entity<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> error::TextParseResult<Entity> {
+    expect_byte(&tokens.extract()?, b'{')?;
 
     let edict = parse_edict(tokens)?;
     let brushes = parse_brushes(tokens)?;
 
-    expect_byte(&tokens.next().transpose()?, b'}')?;
+    expect_byte(&tokens.extract()?, b'}')?;
 
     Ok(Entity { edict, brushes })
 }
 
-fn parse_edict<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Edict> {
+fn parse_edict<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> error::TextParseResult<Edict> {
     let mut edict = Edict::new();
 
     while let Some(tok_res) = tokens.peek() {
-        if tok_res.as_ref().map_err(|e| e.clone())?.match_quoted() {
-            let key = strip_quoted(&tokens.next().transpose()?.unwrap().text)
+        if tok_res
+            .as_ref()
+            .map_err(CellOptionExt::steal)?
+            .match_quoted()
+        {
+            let key = strip_quoted(&tokens.extract()?.unwrap().text)
                 .to_vec()
                 .into();
-            let maybe_value = tokens.next().transpose()?;
+            let maybe_value = tokens.extract()?;
             expect_quoted(&maybe_value)?;
             let value =
                 strip_quoted(&maybe_value.unwrap().text).to_vec().into();
@@ -63,11 +98,11 @@ fn parse_edict<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Edict> {
 
 fn parse_brushes<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> ParseResult<Vec<Brush>> {
+) -> error::TextParseResult<Vec<Brush>> {
     let mut brushes = Vec::new();
 
     while let Some(tok_res) = tokens.peek() {
-        if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'{') {
+        if tok_res.as_ref().map_err(|e| e.steal())?.match_byte(b'{') {
             brushes.push(parse_brush(tokens)?);
         } else {
             break;
@@ -77,35 +112,34 @@ fn parse_brushes<R: Read>(
     Ok(brushes)
 }
 
-fn parse_brush<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Brush> {
+fn parse_brush<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> error::TextParseResult<Brush> {
     let mut surfaces = Vec::with_capacity(MIN_BRUSH_SURFACES);
-    expect_byte(&tokens.next().transpose()?, b'{')?;
+    expect_byte(&tokens.extract()?, b'{')?;
 
     while let Some(tok_res) = tokens.peek() {
-        if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'(') {
+        if tok_res.as_ref().map_err(|e| e.steal())?.match_byte(b'(') {
             surfaces.push(parse_surface(tokens)?);
         } else {
             break;
         }
     }
 
-    expect_byte_or(&tokens.next().transpose()?, b'}', &[b'('])?;
+    expect_byte_or(&tokens.extract()?, b'}', &[b'('])?;
     Ok(surfaces)
 }
 
 fn parse_surface<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> ParseResult<Surface> {
+) -> error::TextParseResult<Surface> {
     let pt1 = parse_point(tokens)?;
     let pt2 = parse_point(tokens)?;
     let pt3 = parse_point(tokens)?;
 
     let half_space = [pt1, pt2, pt3];
 
-    let texture_token = &tokens
-        .next()
-        .transpose()?
-        .ok_or_else(qmap::ParseError::eof)?;
+    let texture_token = &tokens.extract()?.ok_or_else(error::TextParse::eof)?;
 
     let texture = if b'"' == (&texture_token.text)[0].into() {
         strip_quoted(&texture_token.text[..]).to_vec().into()
@@ -114,13 +148,13 @@ fn parse_surface<R: Read>(
     };
 
     let alignment = if let Some(tok_res) = tokens.peek() {
-        if tok_res.as_ref().map_err(|e| e.clone())?.match_byte(b'[') {
+        if tok_res.as_ref().map_err(|e| e.steal())?.match_byte(b'[') {
             parse_valve_alignment(tokens)?
         } else {
             parse_legacy_alignment(tokens)?
         }
     } else {
-        return Err(qmap::ParseError::eof());
+        return Err(error::TextParse::eof());
     };
 
     Ok(Surface {
@@ -130,24 +164,26 @@ fn parse_surface<R: Read>(
     })
 }
 
-fn parse_point<R: Read>(tokens: &mut TokenPeekable<R>) -> ParseResult<Point> {
-    expect_byte(&tokens.next().transpose()?, b'(')?;
-    let x = expect_float(&tokens.next().transpose()?)?;
-    let y = expect_float(&tokens.next().transpose()?)?;
-    let z = expect_float(&tokens.next().transpose()?)?;
-    expect_byte(&tokens.next().transpose()?, b')')?;
+fn parse_point<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> error::TextParseResult<Point> {
+    expect_byte(&tokens.extract()?, b'(')?;
+    let x = expect_float(&tokens.extract()?)?;
+    let y = expect_float(&tokens.extract()?)?;
+    let z = expect_float(&tokens.extract()?)?;
+    expect_byte(&tokens.extract()?, b')')?;
 
     Ok([x, y, z])
 }
 
 fn parse_legacy_alignment<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> ParseResult<Alignment> {
-    let offset_x = expect_float(&tokens.next().transpose()?)?;
-    let offset_y = expect_float(&tokens.next().transpose()?)?;
-    let rotation = expect_float(&tokens.next().transpose()?)?;
-    let scale_x = expect_float(&tokens.next().transpose()?)?;
-    let scale_y = expect_float(&tokens.next().transpose()?)?;
+) -> error::TextParseResult<Alignment> {
+    let offset_x = expect_float(&tokens.extract()?)?;
+    let offset_y = expect_float(&tokens.extract()?)?;
+    let rotation = expect_float(&tokens.extract()?)?;
+    let scale_x = expect_float(&tokens.extract()?)?;
+    let scale_y = expect_float(&tokens.extract()?)?;
 
     Ok(Alignment {
         offset: [offset_x, offset_y],
@@ -159,24 +195,24 @@ fn parse_legacy_alignment<R: Read>(
 
 fn parse_valve_alignment<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> ParseResult<Alignment> {
-    expect_byte(&tokens.next().transpose()?, b'[')?;
-    let u_x = expect_float(&tokens.next().transpose()?)?;
-    let u_y = expect_float(&tokens.next().transpose()?)?;
-    let u_z = expect_float(&tokens.next().transpose()?)?;
-    let offset_x = expect_float(&tokens.next().transpose()?)?;
-    expect_byte(&tokens.next().transpose()?, b']')?;
+) -> error::TextParseResult<Alignment> {
+    expect_byte(&tokens.extract()?, b'[')?;
+    let u_x = expect_float(&tokens.extract()?)?;
+    let u_y = expect_float(&tokens.extract()?)?;
+    let u_z = expect_float(&tokens.extract()?)?;
+    let offset_x = expect_float(&tokens.extract()?)?;
+    expect_byte(&tokens.extract()?, b']')?;
 
-    expect_byte(&tokens.next().transpose()?, b'[')?;
-    let v_x = expect_float(&tokens.next().transpose()?)?;
-    let v_y = expect_float(&tokens.next().transpose()?)?;
-    let v_z = expect_float(&tokens.next().transpose()?)?;
-    let offset_y = expect_float(&tokens.next().transpose()?)?;
-    expect_byte(&tokens.next().transpose()?, b']')?;
+    expect_byte(&tokens.extract()?, b'[')?;
+    let v_x = expect_float(&tokens.extract()?)?;
+    let v_y = expect_float(&tokens.extract()?)?;
+    let v_z = expect_float(&tokens.extract()?)?;
+    let offset_y = expect_float(&tokens.extract()?)?;
+    expect_byte(&tokens.extract()?, b']')?;
 
-    let rotation = expect_float(&tokens.next().transpose()?)?;
-    let scale_x = expect_float(&tokens.next().transpose()?)?;
-    let scale_y = expect_float(&tokens.next().transpose()?)?;
+    let rotation = expect_float(&tokens.extract()?)?;
+    let scale_x = expect_float(&tokens.extract()?)?;
+    let scale_y = expect_float(&tokens.extract()?)?;
 
     Ok(Alignment {
         offset: [offset_x, offset_y],
@@ -186,10 +222,10 @@ fn parse_valve_alignment<R: Read>(
     })
 }
 
-fn expect_byte(token: &Option<Token>, byte: u8) -> ParseResult<()> {
+fn expect_byte(token: &Option<Token>, byte: u8) -> error::TextParseResult<()> {
     match token.as_ref() {
         Some(payload) if payload.match_byte(byte) => Ok(()),
-        Some(payload) => Err(qmap::ParseError::from_parser(
+        Some(payload) => Err(error::TextParse::from_parser(
             format!(
                 "Expected `{}`, got `{}`",
                 char::from(byte),
@@ -197,7 +233,7 @@ fn expect_byte(token: &Option<Token>, byte: u8) -> ParseResult<()> {
             ),
             payload.line_number,
         )),
-        _ => Err(qmap::ParseError::eof()),
+        _ => Err(error::TextParse::eof()),
     }
 }
 
@@ -205,18 +241,18 @@ fn expect_byte_or(
     token: &Option<Token>,
     byte: u8,
     rest: &[u8],
-) -> ParseResult<()> {
+) -> error::TextParseResult<()> {
     match token.as_ref() {
         Some(payload) if payload.match_byte(byte) => Ok(()),
         Some(payload) => {
-            let rest_str = (&rest
+            let rest_str = rest
                 .iter()
                 .copied()
                 .map(|b| format!("`{}`", char::from(b)))
-                .collect::<Vec<_>>()[..])
+                .collect::<Vec<_>>()[..]
                 .join(", ");
 
-            Err(qmap::ParseError::from_parser(
+            Err(error::TextParse::from_parser(
                 format!(
                     "Expected {} or `{}`, got `{}`",
                     rest_str,
@@ -226,31 +262,31 @@ fn expect_byte_or(
                 payload.line_number,
             ))
         }
-        _ => Err(qmap::ParseError::eof()),
+        _ => Err(error::TextParse::eof()),
     }
 }
 
-fn expect_quoted(token: &Option<Token>) -> ParseResult<()> {
+fn expect_quoted(token: &Option<Token>) -> error::TextParseResult<()> {
     match token.as_ref() {
         Some(payload) if payload.match_quoted() => Ok(()),
-        Some(payload) => Err(qmap::ParseError::from_parser(
+        Some(payload) => Err(error::TextParse::from_parser(
             format!("Expected quoted, got `{}`", payload.text_as_string()),
             payload.line_number,
         )),
-        _ => Err(qmap::ParseError::eof()),
+        _ => Err(error::TextParse::eof()),
     }
 }
 
-fn expect_float(token: &Option<Token>) -> ParseResult<f64> {
+fn expect_float(token: &Option<Token>) -> error::TextParseResult<f64> {
     match token.as_ref() {
         Some(payload) => match f64::from_str(&payload.text_as_string()) {
             Ok(num) => Ok(num),
-            Err(_) => Err(qmap::ParseError::from_parser(
+            Err(_) => Err(error::TextParse::from_parser(
                 format!("Expected number, got `{}`", payload.text_as_string()),
                 payload.line_number,
             )),
         },
-        None => Err(qmap::ParseError::eof()),
+        None => Err(error::TextParse::eof()),
     }
 }
 
