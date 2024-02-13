@@ -35,7 +35,7 @@ fn main() {
         match lump {
             Lump::MipTexture(tex) => {
                 println!("Writing texture...");
-                for (idx, image) in tex.into_iter().enumerate() {
+                for (idx, image) in tex.mips().iter().enumerate() {
                     write_png(
                         &format!("{}.{}", &name, idx,),
                         image.width(),

@@ -32,7 +32,7 @@ fn main() {
         {
             lump::Lump::MipTexture(tex) => {
                 println!("Texture");
-                for image in tex {
+                for image in tex.mips() {
                     println!(
                         "\t{}x{}: {} bytes",
                         image.width(),

@@ -36,7 +36,7 @@ pub fn parse_mip_texture(
         mips[i as usize].write(Image::from_pixels(head.width >> i, pixels));
     }
 
-    Ok(MipTexture::new(unsafe {
+    Ok(MipTexture::from_parts(head.name, unsafe {
         mips.map(|elem| elem.assume_init())
     }))
 }

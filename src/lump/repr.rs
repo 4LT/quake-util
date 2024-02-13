@@ -1,9 +1,11 @@
 use crate::error;
 use crate::lump::kind;
+use crate::slice_to_cstring;
 use crate::Palette;
 use std::boxed::Box;
+use std::ffi::{CString, IntoStringError};
 use std::mem::size_of;
-use std::string::ToString;
+use std::string::{String, ToString};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Lump {
@@ -73,13 +75,29 @@ impl Image {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MipTexture {
+    name: [u8; 16],
     mips: [Image; 4],
 }
 
 impl MipTexture {
     pub const LEN: usize = 4;
 
-    pub fn new(mips: [Image; Self::LEN]) -> Self {
+    pub fn from_parts(name: [u8; 16], mips: [Image; Self::LEN]) -> Self {
+        Self::validate_mips(&mips);
+        MipTexture { name, mips }
+    }
+
+    pub fn new(name: String, mips: [Image; Self::LEN]) -> Self {
+        let mut name_field = [0u8; 16];
+        let name_bytes = &name.into_bytes();
+        (&mut name_field[..name_bytes.len()]).copy_from_slice(name_bytes);
+        let name = name_field;
+        Self::validate_mips(&mips);
+
+        MipTexture { name, mips }
+    }
+
+    fn validate_mips(mips: &[Image; Self::LEN]) {
         for l in 0..(Self::LEN - 1) {
             let r = l + 1;
 
@@ -91,8 +109,18 @@ impl MipTexture {
                 panic!("Bad mipmaps");
             }
         }
+    }
 
-        MipTexture { mips }
+    pub fn name_to_cstring(&self) -> CString {
+        slice_to_cstring(&self.name)
+    }
+
+    pub fn name_to_string(&self) -> Result<String, IntoStringError> {
+        self.name_to_cstring().into_string()
+    }
+
+    pub fn name(&self) -> [u8; 16] {
+        self.name
     }
 
     pub fn mip(&self, index: usize) -> &Image {
@@ -102,14 +130,9 @@ impl MipTexture {
             panic!("Outside mip bounds ([0..{}])", Self::LEN);
         }
     }
-}
 
-impl<'a> IntoIterator for &'a MipTexture {
-    type Item = &'a Image;
-    type IntoIter = std::slice::Iter<'a, Image>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.mips[..].iter()
+    pub fn mips(&self) -> &[Image] {
+        &self.mips[..]
     }
 }
 
