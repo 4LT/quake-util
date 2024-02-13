@@ -11,6 +11,8 @@ use std::string::{String, ToString};
 use std::vec::Vec;
 use wad::repr::Head;
 
+/// WAD parser.  Wraps a mutable reference to a Read + Seek cursor to provide
+/// random read access.
 #[derive(Debug)]
 pub struct Parser<'a, Reader: Seek + Read> {
     cursor: &'a mut Reader,
@@ -19,6 +21,9 @@ pub struct Parser<'a, Reader: Seek + Read> {
 }
 
 impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
+    /// Constructs a new wad parser starting at the provided cursor.  May
+    /// produce a list of warnings for duplicate entriess (entries sharing the
+    /// same name).
     pub fn new(cursor: &'a mut Reader) -> BinParseResult<(Self, Vec<String>)> {
         let start = cursor.stream_position().map_err(error::BinParse::Io)?;
         let (directory, warnings) = parse_directory(cursor, start)?;
@@ -33,10 +38,14 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         ))
     }
 
+    /// Clones WAD entries into a hash map.  Entries are used to access lumps
+    /// within the WAD.
     pub fn directory(&self) -> HashMap<String, wad::Entry> {
         self.directory.clone()
     }
 
+    /// Attempts to parse a mip-mapped texture at the offset provided by the
+    /// entry
     pub fn parse_mip_texture(
         &mut self,
         entry: &wad::Entry,
@@ -45,6 +54,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         lump::parse_mip_texture(self.cursor)
     }
 
+    /// Attempts to parse a 2D at the offset provided by the entry
     pub fn parse_image(
         &mut self,
         entry: &wad::Entry,
@@ -53,6 +63,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         lump::parse_image(self.cursor)
     }
 
+    /// Attempts to parse a 768 byte palette at the offset provided by the entry
     pub fn parse_palette(
         &mut self,
         entry: &wad::Entry,
@@ -61,6 +72,8 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         lump::parse_palette(self.cursor)
     }
 
+    /// Attempts to read a number of bytes using the provided entry's length and
+    /// offset
     pub fn read_raw(
         &mut self,
         entry: &wad::Entry,
@@ -72,6 +85,10 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         lump::read_raw(self.cursor, length)
     }
 
+    /// Attempts to read a lump based on the provided entry's name and lump
+    /// kind.  All known kinds of lump are attempted based on the entry.  E.g.
+    /// there is a special case where Quake's gfx.wad has a flat lump named
+    /// CONCHARS which is erroneously tagged as miptex.
     pub fn parse_inferred(
         &mut self,
         entry: &wad::Entry,

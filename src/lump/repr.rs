@@ -90,7 +90,7 @@ impl MipTexture {
     pub fn new(name: String, mips: [Image; Self::LEN]) -> Self {
         let mut name_field = [0u8; 16];
         let name_bytes = &name.into_bytes();
-        (&mut name_field[..name_bytes.len()]).copy_from_slice(name_bytes);
+        name_field[..name_bytes.len()].copy_from_slice(name_bytes);
         let name = name_field;
         Self::validate_mips(&mips);
 

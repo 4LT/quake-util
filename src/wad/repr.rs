@@ -60,6 +60,8 @@ impl TryFrom<[u8; size_of::<Head>()]> for Head {
     }
 }
 
+/// Provides the location of a lump within a WAD archive, length of the lump,
+/// name (16 bytes, null-terminated), and lump kind
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C, packed)]
 pub struct Entry {
@@ -85,26 +87,34 @@ impl Entry {
         }
     }
 
+    /// Obtain the name as a C string.  If the name is not already
+    /// null-terminated (in which case the entry is not well-formed) a null byte
+    /// is appended to make a valid C string.
     pub fn name_to_cstring(&self) -> CString {
         slice_to_cstring(&self.name)
     }
 
+    /// Attempt to interpret the name as UTF-8 encoded string
     pub fn name_to_string(&self) -> Result<String, IntoStringError> {
         self.name_to_cstring().into_string()
     }
 
+    /// Name in raw bytes
     pub fn name(&self) -> [u8; 16] {
         self.name
     }
 
+    /// WAD offset of lump
     pub fn offset(&self) -> u32 {
         self.offset
     }
 
+    /// Length of lump in bytes
     pub fn length(&self) -> u32 {
         self.length
     }
 
+    /// Lump kind as a byte
     pub fn kind(&self) -> u8 {
         self.lump_kind
     }
@@ -113,6 +123,8 @@ impl Entry {
 impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
     type Error = error::BinParse;
 
+    // Attempt to read an entry from a block of bytes.  Fails if compression
+    // flag is on (unsupported).
     fn try_from(bytes: [u8; size_of::<Entry>()]) -> Result<Self, Self::Error> {
         let (offset_bytes, rest) = bytes.split_at(4);
 
