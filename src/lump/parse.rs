@@ -7,6 +7,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::mem::{size_of, transmute, MaybeUninit};
 use std::string::ToString;
 
+/// Attempt to parse bytes into a mip-mapped texture
 pub fn parse_mip_texture(
     cursor: &mut (impl Seek + Read),
 ) -> BinParseResult<MipTexture> {
@@ -41,12 +42,14 @@ pub fn parse_mip_texture(
     }))
 }
 
+/// Attempt to parse 768 bytes into a palette
 pub fn parse_palette(reader: &mut impl Read) -> BinParseResult<Box<Palette>> {
     let mut bytes = [0u8; size_of::<Palette>()];
     reader.read_exact(&mut bytes[..])?;
     Ok(Box::from(unsafe { transmute::<_, Palette>(bytes) }))
 }
 
+/// Attempt to parse a 2D image
 pub fn parse_image(reader: &mut impl Read) -> BinParseResult<Image> {
     let mut u32_buf = [0u8; size_of::<u32>()];
     reader.read_exact(&mut u32_buf[..])?;
@@ -64,6 +67,7 @@ pub fn parse_image(reader: &mut impl Read) -> BinParseResult<Image> {
     Ok(Image::from_pixels(width, pixels))
 }
 
+/// Read `length` bytes into a boxed slice
 pub fn read_raw(
     reader: &mut impl Read,
     length: usize,
