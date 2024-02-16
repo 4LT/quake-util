@@ -31,8 +31,6 @@ impl fmt::Display for BinParse {
 
 impl std::error::Error for BinParse {}
 
-pub type BinParseResult<T> = Result<T, BinParse>;
-
 #[derive(Debug, Clone)]
 pub struct Line {
     pub message: String,
@@ -81,7 +79,7 @@ impl TextParse {
 }
 
 impl From<io::Error> for TextParse {
-    fn from(err: io::Error) -> TextParse {
+    fn from(err: io::Error) -> Self {
         TextParse::Io(err)
     }
 }
@@ -89,13 +87,34 @@ impl From<io::Error> for TextParse {
 impl fmt::Display for TextParse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TextParse::Io(msg) => write!(f, "{}", msg),
-            TextParse::Lexer(err) => write!(f, "{}", err),
-            TextParse::Parser(err) => write!(f, "{}", err),
+            Self::Io(msg) => write!(f, "{}", msg),
+            Self::Lexer(err) => write!(f, "{}", err),
+            Self::Parser(err) => write!(f, "{}", err),
         }
     }
 }
 
 impl std::error::Error for TextParse {}
 
-pub type TextParseResult<T> = std::result::Result<T, TextParse>;
+#[derive(Debug)]
+pub enum Write {
+    Validation(String),
+    Io(std::io::Error),
+}
+
+impl From<io::Error> for Write {
+    fn from(err: io::Error) -> Self {
+        Write::Io(err)
+    }
+}
+
+impl fmt::Display for Write {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Validation(msg) => write!(f, "{}", msg),
+            Self::Io(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl std::error::Error for Write {}

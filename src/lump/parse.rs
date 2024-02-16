@@ -1,7 +1,7 @@
 use crate::common::Palette;
 use crate::error;
 use crate::lump::{Image, MipTexture, MipTextureHead};
-use error::BinParseResult;
+use crate::BinParseResult;
 use std::boxed::Box;
 use std::io::{Read, Seek, SeekFrom};
 use std::mem::{size_of, transmute, MaybeUninit};

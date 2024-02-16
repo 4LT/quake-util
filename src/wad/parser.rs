@@ -1,4 +1,4 @@
-use crate::{error, error::BinParseResult, lump, wad, Palette};
+use crate::{lump, wad, BinParseError, BinParseResult, Palette};
 use io::{Read, Seek, SeekFrom};
 use lump::Lump;
 use std::boxed::Box;
@@ -25,7 +25,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
     /// produce a list of warnings for duplicate entriess (entries sharing the
     /// same name).
     pub fn new(cursor: &'a mut Reader) -> BinParseResult<(Self, Vec<String>)> {
-        let start = cursor.stream_position().map_err(error::BinParse::Io)?;
+        let start = cursor.stream_position().map_err(BinParseError::Io)?;
         let (directory, warnings) = parse_directory(cursor, start)?;
 
         Ok((
@@ -80,7 +80,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
     ) -> BinParseResult<Box<[u8]>> {
         self.seek_to_entry(entry)?;
         let length = usize::try_from(entry.length()).map_err(|_| {
-            error::BinParse::Parse("Length too large".to_string())
+            BinParseError::Parse("Length too large".to_string())
         })?;
         lump::read_raw(self.cursor, length)
     }
@@ -123,7 +123,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         prioritize(entry.kind());
 
         let length = usize::try_from(entry.length()).map_err(|_| {
-            error::BinParse::Parse("Length too large".to_string())
+            BinParseError::Parse("Length too large".to_string())
         })?;
 
         // It's *improbable* that a palette-sized lump could be a valid
@@ -140,7 +140,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
             prioritize(lump::kind::FLAT);
         }
 
-        let mut last_error = error::BinParse::Parse("Unreachable".to_string());
+        let mut last_error = BinParseError::Parse("Unreachable".to_string());
 
         for attempt_kind in attempt_order {
             match attempt_kind {
@@ -187,7 +187,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         let offset = self
             .start
             .checked_add(entry.offset().into())
-            .ok_or(error::BinParse::Parse("Offset too large".to_string()))?;
+            .ok_or(BinParseError::Parse("Offset too large".to_string()))?;
 
         self.cursor.seek(SeekFrom::Start(offset))?;
         Ok(())
@@ -206,11 +206,11 @@ fn parse_directory(
 
     let dir_pos = start
         .checked_add(dir_offset.into())
-        .ok_or(error::BinParse::Parse("Offset too large".to_string()))?;
+        .ok_or(BinParseError::Parse("Offset too large".to_string()))?;
 
     cursor
         .seek(SeekFrom::Start(dir_pos))
-        .map_err(error::BinParse::Io)?;
+        .map_err(BinParseError::Io)?;
 
     let mut entries = HashMap::<String, wad::Entry>::with_capacity(
         entry_ct.try_into().unwrap(),
@@ -226,7 +226,7 @@ fn parse_directory(
 
         let entry_name = entry
             .name_to_string()
-            .map_err(|e| error::BinParse::Parse(e.to_string()))?;
+            .map_err(|e| BinParseError::Parse(e.to_string()))?;
 
         if let MapEntry::Vacant(map_entry) = entries.entry(entry_name.clone()) {
             map_entry.insert(entry);

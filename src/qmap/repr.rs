@@ -7,10 +7,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 use std::{
     collections::HashMap,
-    error,
     ffi::{CStr, CString},
-    fmt,
-    fmt::{Display, Formatter},
     io,
     string::String,
     vec::Vec,
@@ -21,6 +18,9 @@ use {
     alloc::ffi::CString, alloc::format, alloc::string::String, alloc::vec::Vec,
     core::ffi::CStr, hashbrown::HashMap,
 };
+
+#[cfg(feature = "std")]
+use crate::{WriteAttempt, WriteError};
 
 /// Return type for validating writability of entities and other items
 pub type ValidationResult = Result<(), String>;
@@ -35,29 +35,6 @@ pub trait CheckWritable {
     /// by other tools, e.g. qbsp.
     fn check_writable(&self) -> ValidationResult;
 }
-
-#[cfg(feature = "std")]
-#[derive(Debug)]
-pub enum WriteError {
-    Validation(String),
-    Io(std::io::Error),
-}
-
-#[cfg(feature = "std")]
-impl Display for WriteError {
-    fn fmt(&self, formatter: &mut Formatter) -> Result<(), fmt::Error> {
-        match self {
-            Self::Validation(msg) => write!(formatter, "Validation: {}", msg),
-            Self::Io(err) => write!(formatter, "I/O: {}", err),
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl error::Error for WriteError {}
-
-#[cfg(feature = "std")]
-pub type WriteAttempt = Result<(), WriteError>;
 
 /// 3-dimensional point used to determine the half-space a surface lies on
 pub type Point = [f64; 3];

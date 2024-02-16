@@ -1,4 +1,3 @@
-#[cfg(feature = "std")]
 extern crate std;
 
 use std::{
@@ -6,7 +5,7 @@ use std::{
     vec::Vec,
 };
 
-use crate::{common, error, qmap};
+use crate::{common, qmap, TextParseError, TextParseResult};
 use common::CellOptionExt;
 use qmap::lexer::{Token, TokenIterator};
 use qmap::repr::{Alignment, Brush, Edict, Entity, Point, QuakeMap, Surface};
@@ -14,24 +13,24 @@ use qmap::repr::{Alignment, Brush, Edict, Entity, Point, QuakeMap, Surface};
 type TokenPeekable<R> = Peekable<TokenIterator<R>>;
 
 trait Extract {
-    fn extract(&mut self) -> Result<Option<Token>, error::TextParse>;
+    fn extract(&mut self) -> TextParseResult<Option<Token>>;
 }
 
 impl<R> Extract for TokenPeekable<R>
 where
     R: Read,
 {
-    fn extract(&mut self) -> Result<Option<Token>, error::TextParse> {
+    fn extract(&mut self) -> Result<Option<Token>, TextParseError> {
         self.next().transpose().map_err(|e| e.into_unwrapped())
     }
 }
 
 trait Normalize {
-    fn normalize(&self) -> Result<&Option<Token>, error::TextParse>;
+    fn normalize(&self) -> TextParseResult<&Option<Token>>;
 }
 
-impl Normalize for Result<Option<Token>, Cell<Option<error::TextParse>>> {
-    fn normalize(&self) -> Result<&Option<Token>, error::TextParse> {
+impl Normalize for Result<Option<Token>, Cell<Option<TextParseError>>> {
+    fn normalize(&self) -> Result<&Option<Token>, TextParseError> {
         self.as_ref().map_err(|e| e.steal())
     }
 }
@@ -44,7 +43,7 @@ const MIN_BRUSH_SURFACES: usize = 4;
 /// `brushDef`s/`patchDef`s are not presently supported) but may have texture
 /// alignment in either "Valve220" format or the "legacy" predecessor (i.e.
 /// without texture axes)
-pub fn parse<R: Read>(reader: &mut R) -> error::TextParseResult<QuakeMap> {
+pub fn parse<R: Read>(reader: &mut R) -> TextParseResult<QuakeMap> {
     let mut entities: Vec<Entity> = Vec::new();
     let mut peekable_tokens = TokenIterator::new(reader).peekable();
 
@@ -58,7 +57,7 @@ pub fn parse<R: Read>(reader: &mut R) -> error::TextParseResult<QuakeMap> {
 
 fn parse_entity<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Entity> {
+) -> TextParseResult<Entity> {
     expect_byte(&tokens.extract()?, b'{')?;
 
     let edict = parse_edict(tokens)?;
@@ -71,7 +70,7 @@ fn parse_entity<R: Read>(
 
 fn parse_edict<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Edict> {
+) -> TextParseResult<Edict> {
     let mut edict = Edict::new();
 
     while let Some(tok_res) = tokens.peek() {
@@ -98,7 +97,7 @@ fn parse_edict<R: Read>(
 
 fn parse_brushes<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Vec<Brush>> {
+) -> TextParseResult<Vec<Brush>> {
     let mut brushes = Vec::new();
 
     while let Some(tok_res) = tokens.peek() {
@@ -114,7 +113,7 @@ fn parse_brushes<R: Read>(
 
 fn parse_brush<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Brush> {
+) -> TextParseResult<Brush> {
     let mut surfaces = Vec::with_capacity(MIN_BRUSH_SURFACES);
     expect_byte(&tokens.extract()?, b'{')?;
 
@@ -132,14 +131,14 @@ fn parse_brush<R: Read>(
 
 fn parse_surface<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Surface> {
+) -> TextParseResult<Surface> {
     let pt1 = parse_point(tokens)?;
     let pt2 = parse_point(tokens)?;
     let pt3 = parse_point(tokens)?;
 
     let half_space = [pt1, pt2, pt3];
 
-    let texture_token = &tokens.extract()?.ok_or_else(error::TextParse::eof)?;
+    let texture_token = &tokens.extract()?.ok_or_else(TextParseError::eof)?;
 
     let texture = if b'"' == (&texture_token.text)[0].into() {
         strip_quoted(&texture_token.text[..]).to_vec().into()
@@ -154,7 +153,7 @@ fn parse_surface<R: Read>(
             parse_legacy_alignment(tokens)?
         }
     } else {
-        return Err(error::TextParse::eof());
+        return Err(TextParseError::eof());
     };
 
     Ok(Surface {
@@ -166,7 +165,7 @@ fn parse_surface<R: Read>(
 
 fn parse_point<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Point> {
+) -> TextParseResult<Point> {
     expect_byte(&tokens.extract()?, b'(')?;
     let x = expect_float(&tokens.extract()?)?;
     let y = expect_float(&tokens.extract()?)?;
@@ -178,7 +177,7 @@ fn parse_point<R: Read>(
 
 fn parse_legacy_alignment<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Alignment> {
+) -> TextParseResult<Alignment> {
     let offset_x = expect_float(&tokens.extract()?)?;
     let offset_y = expect_float(&tokens.extract()?)?;
     let rotation = expect_float(&tokens.extract()?)?;
@@ -195,7 +194,7 @@ fn parse_legacy_alignment<R: Read>(
 
 fn parse_valve_alignment<R: Read>(
     tokens: &mut TokenPeekable<R>,
-) -> error::TextParseResult<Alignment> {
+) -> TextParseResult<Alignment> {
     expect_byte(&tokens.extract()?, b'[')?;
     let u_x = expect_float(&tokens.extract()?)?;
     let u_y = expect_float(&tokens.extract()?)?;
@@ -222,10 +221,10 @@ fn parse_valve_alignment<R: Read>(
     })
 }
 
-fn expect_byte(token: &Option<Token>, byte: u8) -> error::TextParseResult<()> {
+fn expect_byte(token: &Option<Token>, byte: u8) -> TextParseResult<()> {
     match token.as_ref() {
         Some(payload) if payload.match_byte(byte) => Ok(()),
-        Some(payload) => Err(error::TextParse::from_parser(
+        Some(payload) => Err(TextParseError::from_parser(
             format!(
                 "Expected `{}`, got `{}`",
                 char::from(byte),
@@ -233,7 +232,7 @@ fn expect_byte(token: &Option<Token>, byte: u8) -> error::TextParseResult<()> {
             ),
             payload.line_number,
         )),
-        _ => Err(error::TextParse::eof()),
+        _ => Err(TextParseError::eof()),
     }
 }
 
@@ -241,7 +240,7 @@ fn expect_byte_or(
     token: &Option<Token>,
     byte: u8,
     rest: &[u8],
-) -> error::TextParseResult<()> {
+) -> TextParseResult<()> {
     match token.as_ref() {
         Some(payload) if payload.match_byte(byte) => Ok(()),
         Some(payload) => {
@@ -252,7 +251,7 @@ fn expect_byte_or(
                 .collect::<Vec<_>>()[..]
                 .join(", ");
 
-            Err(error::TextParse::from_parser(
+            Err(TextParseError::from_parser(
                 format!(
                     "Expected {} or `{}`, got `{}`",
                     rest_str,
@@ -262,31 +261,31 @@ fn expect_byte_or(
                 payload.line_number,
             ))
         }
-        _ => Err(error::TextParse::eof()),
+        _ => Err(TextParseError::eof()),
     }
 }
 
-fn expect_quoted(token: &Option<Token>) -> error::TextParseResult<()> {
+fn expect_quoted(token: &Option<Token>) -> TextParseResult<()> {
     match token.as_ref() {
         Some(payload) if payload.match_quoted() => Ok(()),
-        Some(payload) => Err(error::TextParse::from_parser(
+        Some(payload) => Err(TextParseError::from_parser(
             format!("Expected quoted, got `{}`", payload.text_as_string()),
             payload.line_number,
         )),
-        _ => Err(error::TextParse::eof()),
+        _ => Err(TextParseError::eof()),
     }
 }
 
-fn expect_float(token: &Option<Token>) -> error::TextParseResult<f64> {
+fn expect_float(token: &Option<Token>) -> TextParseResult<f64> {
     match token.as_ref() {
         Some(payload) => match f64::from_str(&payload.text_as_string()) {
             Ok(num) => Ok(num),
-            Err(_) => Err(error::TextParse::from_parser(
+            Err(_) => Err(TextParseError::from_parser(
                 format!("Expected number, got `{}`", payload.text_as_string()),
                 payload.line_number,
             )),
         },
-        None => Err(error::TextParse::eof()),
+        None => Err(TextParseError::eof()),
     }
 }
 
