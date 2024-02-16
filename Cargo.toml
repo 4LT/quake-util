@@ -1,11 +1,12 @@
 [package]
 name = "quake-util"
 version = "0.3.0"
-authors = ["Seth <rader.seth@gmail.com>"]
+authors = ["Seth Rader"]
 edition = "2021"
 description = "A utility library for using Quake file formats"
 license = "CC0-1.0 OR MIT OR Apache-2.0"
 documentation = "https://docs.rs/quake-util"
+repository = "https://github.com/4LT/quake-util"
 
 [features]
 default = ["std"]
