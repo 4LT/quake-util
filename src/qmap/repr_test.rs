@@ -8,7 +8,7 @@ use qmap::{CheckWritable, ValidationResult};
 
 #[cfg(feature = "std")]
 use {
-    qmap::WriteError,
+    crate::WriteError,
     std::ffi::{CStr, CString},
     std::str,
     std::string::String,

@@ -17,9 +17,8 @@
 //! #
 //! #       let mut dest = Vec::<u8>::new();
 //! #
-//! use quake_util::qmap;
-//! use qmap::{Entity, WriteError};
-//! use quake_util::error::TextParse as TextParseError;
+//! use quake_util::{qmap, WriteError, TextParseError};
+//! use qmap::Entity;
 //!
 //! let mut map = qmap::parse(&mut source).map_err(|err| match err {
 //!     TextParseError::Io(_) => String::from("Failed to read map"),
@@ -66,9 +65,6 @@ pub use repr::{
 
 #[cfg(feature = "std")]
 pub use parser::parse;
-
-#[cfg(feature = "std")]
-pub use repr::{WriteAttempt, WriteError};
 
 // test suites
 
