@@ -88,8 +88,8 @@ fn access_mip_levels() {
     ];
     let miptex = MipTexture::from_parts([0u8; 16], images.clone());
 
-    for i in 0..4 {
-        assert_eq!(miptex.mip(i), &images[i]);
+    for (i, image) in images.iter().enumerate() {
+        assert_eq!(miptex.mip(i), image);
     }
 }
 

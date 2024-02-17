@@ -28,6 +28,9 @@ pub mod lump;
 #[cfg(feature = "std")]
 pub mod wad;
 
+#[cfg(feature = "std")]
+pub mod bsp;
+
 pub mod qmap;
 
 #[cfg(feature = "std")]
