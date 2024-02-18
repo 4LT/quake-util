@@ -45,7 +45,7 @@ pub type Vec2 = [f64; 2];
 ///
 /// Contains a list of entities. Internal texture alignments may be in the
 /// original "legacy" Id format, the "Valve 220" format, or a mix of the two.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct QuakeMap {
     pub entities: Vec<Entity>,
 }
@@ -80,7 +80,7 @@ impl CheckWritable for QuakeMap {
 }
 
 /// Entity type: `Brush` for entities with brushes, `Point` for entities without
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EntityKind {
     Point,
     Brush,
@@ -88,7 +88,7 @@ pub enum EntityKind {
 
 /// A collection of key/value pairs in the form of an *edict* and 0 or more
 /// brushes
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Entity {
     pub edict: Edict,
     pub brushes: Vec<Brush>,
@@ -176,7 +176,7 @@ impl CheckWritable for Brush {
 }
 
 /// Brush face
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Surface {
     pub half_space: HalfSpace,
     pub texture: CString,
@@ -221,7 +221,7 @@ impl CheckWritable for HalfSpace {
 ///
 /// If axes are present, the alignment will be written in the "Valve220" format;
 /// otherwise it will be written in the "legacy" format pre-dating Valve220.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Alignment {
     pub offset: Vec2,
     pub rotation: f64,

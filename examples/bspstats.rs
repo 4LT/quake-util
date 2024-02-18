@@ -1,3 +1,4 @@
+#[cfg(feature = "std")]
 fn main() {
     use bsp::EntryOffset;
     use quake_util::bsp;
@@ -55,3 +56,6 @@ Lighting: {lighting}
 VIS: {vis}"
     );
 }
+
+#[cfg(not(feature = "std"))]
+fn main() {}

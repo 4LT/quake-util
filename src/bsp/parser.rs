@@ -1,6 +1,7 @@
 use super::{Entry, EntryOffset, Head};
 use crate::{BinParseError, BinParseResult, TextParseError};
-use std::io::{Read, Seek, SeekFrom};
+use io::{Read, Seek, SeekFrom};
+use std::io;
 use std::mem::size_of;
 use std::string::String;
 
@@ -28,10 +29,14 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         })
     }
 
+    pub fn version(&self) -> u32 {
+        self.header.version()
+    }
+
     pub fn lump_reader(
-        &'a mut self,
+        &mut self,
         entry_offset: EntryOffset,
-    ) -> BinParseResult<std::io::Take<&'a mut Reader>> {
+    ) -> BinParseResult<std::io::Take<&mut Reader>> {
         let Entry { offset, length } = self.header.entry(entry_offset);
         let length = length.into();
 
@@ -45,20 +50,20 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         Ok(self.cursor.take(length))
     }
 
-    pub fn lump_empty(&'a self, offset: EntryOffset) -> bool {
+    pub fn lump_empty(&self, offset: EntryOffset) -> bool {
         let length = self.header.entry(offset).length;
         length == 0
     }
 
-    pub fn parse_entities(&'a mut self) -> BinParseResult<QuakeMap> {
+    pub fn parse_entities(&mut self) -> BinParseResult<QuakeMap> {
         let lump = self.lump_reader(EntryOffset::Entities)?;
-        // strip off null-terminator
         let limit = lump.limit();
 
         if limit < 1 {
             return Ok(qmap::QuakeMap::new());
         }
 
+        // strip off null-terminator
         let mut lump = lump.take(limit - 1);
 
         qmap::parse(&mut lump).map_err(|e| match e {

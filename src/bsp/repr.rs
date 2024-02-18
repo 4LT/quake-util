@@ -50,6 +50,10 @@ impl Head {
         let idx: usize = offset.into();
         self.entries[idx]
     }
+
+    pub fn version(&self) -> u32 {
+        self.version
+    }
 }
 
 impl TryFrom<[u8; size_of::<Head>()]> for Head {
