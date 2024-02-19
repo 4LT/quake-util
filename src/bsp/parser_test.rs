@@ -74,6 +74,25 @@ fn parse_empty_entities() {
 }
 
 #[test]
+fn parse_entities_with_nulls() {
+    let mut bytes = [0u8; HEAD_SZ + 7];
+    bytes[0] = 29;
+    bytes[4..8].copy_from_slice(&(HEAD_SZ as u32).to_le_bytes());
+    bytes[8..12].copy_from_slice(&(7u32).to_le_bytes());
+    bytes[HEAD_SZ] = b'{';
+    bytes[HEAD_SZ + 1] = b'\n';
+    bytes[HEAD_SZ + 2] = b'}';
+    bytes[HEAD_SZ + 4] = b'[';
+
+    let mut cursor = Cursor::new(bytes);
+    let mut parser = bsp::Parser::new(&mut cursor).unwrap();
+
+    let quake_map = parser.parse_entities().unwrap();
+
+    assert_eq!(quake_map.entities.len(), 1);
+}
+
+#[test]
 fn parse_bad_entities() {
     let mut bytes = [0u8; HEAD_SZ + 2];
     bytes[0] = 29;

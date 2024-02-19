@@ -57,18 +57,60 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
 
     pub fn parse_entities(&mut self) -> BinParseResult<QuakeMap> {
         let lump = self.lump_reader(EntryOffset::Entities)?;
-        let limit = lump.limit();
+        let byte_iter = lump.bytes().take_while(|b| match b {
+            Ok(byte) => byte != &0,
+            _ => true,
+        });
 
-        if limit < 1 {
-            return Ok(qmap::QuakeMap::new());
-        }
-
-        // strip off null-terminator
-        let mut lump = lump.take(limit - 1);
-
-        qmap::parse(&mut lump).map_err(|e| match e {
+        qmap::parse(&mut IterReader::new(byte_iter)).map_err(|e| match e {
             TextParseError::Io(ioe) => ioe.into(),
             err => BinParseError::Parse(format!("{err}")),
         })
+    }
+}
+
+struct IterReader<I>
+where
+    I: Iterator<Item = Result<u8, io::Error>>,
+{
+    iter: I,
+}
+
+impl<I> IterReader<I>
+where
+    I: Iterator<Item = Result<u8, io::Error>>,
+{
+    pub fn new(iter: I) -> Self {
+        IterReader { iter }
+    }
+}
+
+impl<I> Read for IterReader<I>
+where
+    I: Iterator<Item = Result<u8, io::Error>>,
+{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let count = buf.len();
+        let mut i = 0;
+
+        while i < count {
+            let b = self.iter.next();
+
+            match b {
+                None => {
+                    return Ok(i);
+                }
+                Some(Err(e)) => {
+                    return Err(e);
+                }
+                Some(Ok(byte)) => {
+                    buf[i] = byte;
+                }
+            }
+
+            i += 1;
+        }
+
+        Ok(i)
     }
 }
