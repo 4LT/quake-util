@@ -1,18 +1,11 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "alloc_fills")]
 extern crate alloc;
 
 #[cfg(feature = "std")]
-use std::{
-    ffi::{CStr, CString},
-    io,
-    string::String,
-    vec::Vec,
-};
+use std::io;
 
-#[cfg(feature = "alloc_fills")]
 use {
     alloc::ffi::CString, alloc::format, alloc::string::String, alloc::vec::Vec,
     core::ffi::CStr,
