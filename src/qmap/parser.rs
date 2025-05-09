@@ -1,9 +1,6 @@
 extern crate std;
 
-use std::{
-    cell::Cell, io::Read, iter::Peekable, num::NonZeroU8, str::FromStr,
-    vec::Vec,
-};
+use std::{io::Read, iter::Peekable, num::NonZeroU8, str::FromStr, vec::Vec};
 
 use crate::{common, qmap, TextParseError, TextParseResult};
 use common::CellOptionExt;
@@ -22,16 +19,6 @@ where
 {
     fn extract(&mut self) -> Result<Option<Token>, TextParseError> {
         self.next().transpose().map_err(|e| e.into_unwrapped())
-    }
-}
-
-trait Normalize {
-    fn normalize(&self) -> TextParseResult<&Option<Token>>;
-}
-
-impl Normalize for Result<Option<Token>, Cell<Option<TextParseError>>> {
-    fn normalize(&self) -> Result<&Option<Token>, TextParseError> {
-        self.as_ref().map_err(|e| e.steal())
     }
 }
 
