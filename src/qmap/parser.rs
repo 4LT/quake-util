@@ -112,7 +112,7 @@ fn parse_brush<R: Read>(
         }
     }
 
-    expect_byte_or(&tokens.extract()?, b'}', &[b'('])?;
+    expect_byte_or(&tokens.extract()?, b'}', b"(")?;
     Ok(surfaces)
 }
 

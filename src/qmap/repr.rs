@@ -68,6 +68,12 @@ impl QuakeMap {
     }
 }
 
+impl Default for QuakeMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CheckWritable for QuakeMap {
     fn check_writable(&self) -> ValidationResult {
         for ent in &self.entities {

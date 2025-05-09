@@ -48,7 +48,7 @@ impl Image {
     pub fn from_pixels(width: u32, pixels: Box<[u8]>) -> Self {
         let pixel_ct: u32 = pixels.len().try_into().expect("Too many pixels");
 
-        if pixels.len() == 0 {
+        if pixels.is_empty() {
             return Image {
                 width: 0,
                 height: 0,
