@@ -62,16 +62,16 @@ fn panic_expected_error() {
 
 fn simple_edict() -> Edict {
     let mut edict = Edict::new();
-    edict.insert(
+    edict.push((
         CString::new("classname").unwrap(),
         CString::new("worldspawn").unwrap(),
-    );
+    ));
     edict
 }
 
 fn bad_edict_key() -> Edict {
     let mut edict = Edict::new();
-    edict.insert(CString::new("\n").unwrap(), CString::new("oops").unwrap());
+    edict.push((CString::new("\n").unwrap(), CString::new("oops").unwrap()));
     edict
 }
 
@@ -174,7 +174,7 @@ fn check_bad_entities() {
         let key = CString::new(key).unwrap();
         let value = CString::new(value).unwrap();
         let mut edict = Edict::new();
-        edict.insert(key, value);
+        edict.push((key, value));
         let ent = Entity {
             edict,
             brushes: vec![],

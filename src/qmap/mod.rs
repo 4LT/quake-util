@@ -28,15 +28,15 @@
 //!
 //! let mut soldier = Entity::new();
 //!
-//! soldier.edict.insert(
+//! soldier.edict.push((
 //!     CString::new("classname").unwrap(),
 //!     CString::new("monster_army").unwrap(),
-//! );
+//! ));
 //!
-//! soldier.edict.insert(
+//! soldier.edict.push((
 //!     CString::new("origin").unwrap(),
 //!     CString::new("128 -256 24").unwrap(),
-//! );
+//! ));
 //!
 //! map.entities.push(soldier);
 //!

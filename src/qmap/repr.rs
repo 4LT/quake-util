@@ -6,7 +6,6 @@ extern crate alloc;
 
 #[cfg(feature = "std")]
 use std::{
-    collections::HashMap,
     ffi::{CStr, CString},
     io,
     string::String,
@@ -16,7 +15,7 @@ use std::{
 #[cfg(feature = "alloc_fills")]
 use {
     alloc::ffi::CString, alloc::format, alloc::string::String, alloc::vec::Vec,
-    core::ffi::CStr, hashbrown::HashMap,
+    core::ffi::CStr,
 };
 
 #[cfg(feature = "std")]
@@ -149,7 +148,7 @@ impl CheckWritable for Entity {
 }
 
 /// Entity dictionary
-pub type Edict = HashMap<CString, CString>;
+pub type Edict = Vec<(CString, CString)>;
 
 impl CheckWritable for Edict {
     fn check_writable(&self) -> ValidationResult {

@@ -73,7 +73,7 @@ fn parse_edict<R: Read>(
             expect_quoted(&maybe_value)?;
             let value =
                 strip_quoted(&maybe_value.unwrap().text).to_vec().into();
-            edict.insert(key, value);
+            edict.push((key, value));
         } else {
             break;
         }
