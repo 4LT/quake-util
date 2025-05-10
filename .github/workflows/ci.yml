@@ -1,10 +1,10 @@
-name: Rust
+name: Rust CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        feature-set: ['', '--no-default-features --features alloc_fills']
+        feature-set: ['', '--no-default-features']
 
     steps:
     - uses: actions/checkout@v3
