@@ -5,7 +5,10 @@ use std::{io::Read, iter::Peekable, num::NonZeroU8, str::FromStr, vec::Vec};
 use crate::{common, qmap, TextParseError, TextParseResult};
 use common::CellOptionExt;
 use qmap::lexer::{Token, TokenIterator};
-use qmap::repr::{Alignment, Brush, Edict, Entity, Point, QuakeMap, Surface};
+use qmap::repr::{
+    Alignment, Brush, Edict, Entity, Point, Quake2SurfaceExtension, QuakeMap,
+    Surface,
+};
 
 type TokenPeekable<R> = Peekable<TokenIterator<R>>;
 
@@ -26,10 +29,9 @@ const MIN_BRUSH_SURFACES: usize = 4;
 
 /// Parses a Quake source map
 ///
-/// Maps must be in the Quake 1 format (Quake 2 surface flags and Quake 3
-/// `brushDef`s/`patchDef`s are not presently supported) but may have texture
-/// alignment in either "Valve220" format or the "legacy" predecessor (i.e.
-/// without texture axes)
+/// Maps must be in the Quake 1 or 2 format (Quake 3 `brushDef`s/`patchDef`s are
+/// not presently supported) but may have texture alignment in either "Valve220"
+/// format or the "legacy" predecessor (i.e. without texture axes)
 pub fn parse<R: Read>(reader: &mut R) -> TextParseResult<QuakeMap> {
     let mut entities: Vec<Entity> = Vec::new();
     let mut peekable_tokens = TokenIterator::new(reader).peekable();
@@ -143,10 +145,21 @@ fn parse_surface<R: Read>(
         return Err(TextParseError::eof());
     };
 
+    let q2ext = if let Some(tok_res) = tokens.peek() {
+        if tok_res.as_ref().map_err(|e| e.steal())?.starts_numeric() {
+            parse_q2_ext(tokens)?
+        } else {
+            Default::default()
+        }
+    } else {
+        return Err(TextParseError::eof());
+    };
+
     Ok(Surface {
         half_space,
         texture,
         alignment,
+        q2ext,
     })
 }
 
@@ -176,6 +189,20 @@ fn parse_legacy_alignment<R: Read>(
         rotation,
         scale: [scale_x, scale_y],
         axes: None,
+    })
+}
+
+fn parse_q2_ext<R: Read>(
+    tokens: &mut TokenPeekable<R>,
+) -> TextParseResult<Quake2SurfaceExtension> {
+    let content_flags = expect_int(&tokens.extract()?)?;
+    let surface_flags = expect_int(&tokens.extract()?)?;
+    let surface_value = expect_float(&tokens.extract()?)?;
+
+    Ok(Quake2SurfaceExtension {
+        content_flags,
+        surface_flags,
+        surface_value,
     })
 }
 
@@ -269,6 +296,19 @@ fn expect_float(token: &Option<Token>) -> TextParseResult<f64> {
             Ok(num) => Ok(num),
             Err(_) => Err(TextParseError::from_parser(
                 format!("Expected number, got `{}`", payload.text_as_string()),
+                payload.line_number,
+            )),
+        },
+        None => Err(TextParseError::eof()),
+    }
+}
+
+fn expect_int(token: &Option<Token>) -> TextParseResult<i32> {
+    match token.as_ref() {
+        Some(payload) => match i32::from_str(&payload.text_as_string()) {
+            Ok(num) => Ok(num),
+            Err(_) => Err(TextParseError::from_parser(
+                format!("Expected integer, got `{}`", payload.text_as_string()),
                 payload.line_number,
             )),
         },
