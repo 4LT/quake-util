@@ -174,11 +174,15 @@ impl CheckWritable for Brush {
 }
 
 /// Brush face
+///
+/// Set `q2ext` to its default (`Default::default()`) value to create a surface
+/// compatible for Quake 1 tools
 #[derive(Clone, Debug)]
 pub struct Surface {
     pub half_space: HalfSpace,
     pub texture: CString,
     pub alignment: Alignment,
+    pub q2ext: Quake2SurfaceExtension,
 }
 
 impl Surface {
@@ -189,6 +193,11 @@ impl Surface {
         write_texture_to(&self.texture, writer)?;
         writer.write_all(b" ").map_err(WriteError::Io)?;
         self.alignment.write_to(writer)?;
+
+        if !self.q2ext.is_zeroed() {
+            self.q2ext.write_to(writer)?;
+        }
+
         Ok(())
     }
 }
@@ -265,6 +274,58 @@ impl Alignment {
             }
         }
         Ok(())
+    }
+}
+
+/// Quake II Surface Extension
+///
+/// Additional fields for surfaces to support Quake II maps.  Contains two
+/// bit fields (up to 31 bits in each; negative values are non-standard, but
+/// a signed type is used for consistency with existing tools) and a floating-
+/// point value (_ought_ to be an integer, but TrenchBroom allows writing
+/// floats).
+#[derive(Clone, Copy, Debug)]
+pub struct Quake2SurfaceExtension {
+    /// Flags describing contents of the brush
+    pub content_flags: i32,
+
+    /// Flags describing the surface
+    pub surface_flags: i32,
+
+    /// Value associated with surface, e.g. light value for emissive surfaces
+    pub surface_value: f64,
+}
+
+impl Quake2SurfaceExtension {
+    /// Returns true if all fields are 0, otherwise false.  Behavior is
+    /// undefined if `surface_value` is NaN (read: behavior may change between
+    /// revisions without remark).
+    pub fn is_zeroed(&self) -> bool {
+        self.content_flags == 0
+            && self.surface_flags == 0
+            && self.surface_value == 0.0
+    }
+
+    #[cfg(feature = "std")]
+    fn write_to<W: io::Write>(&self, writer: &mut W) -> WriteAttempt {
+        write!(
+            writer,
+            "{} {} {}",
+            self.content_flags, self.surface_flags, self.surface_value,
+        )
+        .map_err(WriteError::Io)?;
+
+        Ok(())
+    }
+}
+
+impl Default for Quake2SurfaceExtension {
+    fn default() -> Self {
+        Self {
+            content_flags: 0,
+            surface_flags: 0,
+            surface_value: 0.0,
+        }
     }
 }
 

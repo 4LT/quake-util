@@ -79,6 +79,7 @@ fn simple_surface() -> Surface {
         half_space: GOOD_HALF_SPACE,
         texture: CString::new("{FENCE").unwrap(),
         alignment: GOOD_ALIGNMENT,
+        q2ext: Default::default(),
     }
 }
 
@@ -119,6 +120,7 @@ fn entity_with_texture(texture: &CStr) -> Entity {
             half_space: GOOD_HALF_SPACE,
             texture: CString::from(texture),
             alignment: GOOD_ALIGNMENT,
+            q2ext: Default::default(),
         }]],
     }
 }
@@ -196,6 +198,7 @@ fn check_bad_surface_half_space() {
         half_space: BAD_HALF_SPACE,
         texture: CString::new("butts").unwrap(),
         alignment: GOOD_ALIGNMENT,
+        q2ext: Default::default(),
     };
 
     expect_err_containing(surf.check_writable(), "finite");
@@ -207,6 +210,7 @@ fn check_bad_surface_alignment() {
         half_space: GOOD_HALF_SPACE,
         texture: CString::new("potato").unwrap(),
         alignment: BAD_ALIGNMENT_ROTATION,
+        q2ext: Default::default(),
     };
 
     assert!(surf.check_writable().is_err());
@@ -370,6 +374,7 @@ mod write {
                     scale: BAD_VEC2,
                     axes: Some(GOOD_AXES),
                 },
+                q2ext: Default::default(),
             }]],
         });
         let res = qmap.write_to(&mut dest);

@@ -94,6 +94,7 @@ fn parse_standard_brush_entity() {
     assert_eq!(surface.alignment.offset, [0.0, 0.0]);
     assert_eq!(surface.alignment.rotation, 0.0);
     assert_eq!(surface.alignment.scale, [1.0, 1.0]);
+    assert!(surface.q2ext.is_zeroed());
 }
 
 #[test]
@@ -127,6 +128,7 @@ fn parse_valve_brush_entity() {
         surface.alignment.axes,
         Some([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
     );
+    assert!(surface.q2ext.is_zeroed());
 }
 
 #[test]
@@ -187,6 +189,35 @@ fn parse_weird_textures() {
     assert_eq!(surface1.texture, CString::new("{FENCE").unwrap());
     assert_eq!(surface2.texture, CString::new("spaced out").unwrap());
     assert_eq!(surface3.texture, CString::new(r#"silly"example"#).unwrap());
+}
+
+#[test]
+fn parse_q2_surface() {
+    let map = parse(
+        &mut &br#"
+            { {
+                ( 1 2 3 ) ( 4 5 6 ) ( 7 8 9 )
+                T
+                0 0 0 1 1 -97 9 255
+
+                ( 2 5 7 ) ( 8 9 7 ) ( 4 3 6 )
+                T
+                0 0 0 1 1 0 -9 -13.7
+            } }
+        "#[..],
+    )
+    .unwrap();
+
+    let std_ext = &map.entities[0].brushes[0][0].q2ext;
+    let valve_ext = &map.entities[0].brushes[0][1].q2ext;
+    assert!(!std_ext.is_zeroed());
+    assert_eq!(std_ext.content_flags, -97);
+    assert_eq!(std_ext.surface_flags, 9);
+    assert_eq!(std_ext.surface_value, 255.0);
+    assert!(!valve_ext.is_zeroed());
+    assert_eq!(valve_ext.content_flags, 0);
+    assert_eq!(valve_ext.surface_flags, -9);
+    assert_eq!(valve_ext.surface_value, -13.7);
 }
 
 // Parse errors
@@ -269,10 +300,26 @@ fn parse_unclosed_surface() {
         {
     "#;
     let err = parse(&mut &map_text[..]).err().unwrap();
-    if let error::TextParse::Parser(line_err) = err {
-        let (pfx, _) = line_err.message.split_once("got").unwrap();
-        assert!(pfx.contains("`}`"));
-        assert!(pfx.contains("`(`"));
+    if let error::TextParse::Parser(ref line_err) = err {
+        assert!(line_err.message.contains("`}`"));
+        assert!(line_err.message.contains("`(`"));
+    } else {
+        panic_unexpected_variant(err);
+    }
+}
+
+#[test]
+fn parse_incomplete_q2_extension() {
+    let map_text = br#"
+        { {
+            ( 1 2 3 ) ( 4 5 6 ) ( 7 8 9 ) t 0 0 0 1 1 -2
+        } }
+    "#;
+
+    let err = parse(&mut &map_text[..]).err().unwrap();
+    if let error::TextParse::Parser(ref line_err) = err {
+        assert!(line_err.message.contains("integer"));
+        assert!(line_err.message.contains("`}`"));
     } else {
         panic_unexpected_variant(err);
     }
