@@ -195,6 +195,7 @@ impl Surface {
         self.alignment.write_to(writer)?;
 
         if !self.q2ext.is_zeroed() {
+            writer.write_all(b" ").map_err(WriteError::Io)?;
             self.q2ext.write_to(writer)?;
         }
 
