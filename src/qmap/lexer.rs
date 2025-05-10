@@ -33,6 +33,13 @@ impl Token {
             && self.text.last() == Some(&b'"'.try_into().unwrap())
     }
 
+    pub fn starts_numeric(&self) -> bool {
+        !self.text.is_empty() && {
+            let first_byte = self.text[0].get();
+            first_byte == b'-' || first_byte.is_ascii_digit()
+        }
+    }
+
     pub fn text_as_string(&self) -> String {
         self.text
             .iter()
