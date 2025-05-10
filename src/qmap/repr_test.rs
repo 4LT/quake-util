@@ -47,6 +47,12 @@ const BAD_ALIGNMENT_ROTATION: Alignment = Alignment {
     axes: Some(GOOD_AXES),
 };
 
+const Q2_EXTENSION: Quake2SurfaceExtension = Quake2SurfaceExtension {
+    content_flags: 1237,
+    surface_flags: -101,
+    surface_value: 300.0,
+};
+
 fn expect_err_containing(res: ValidationResult, text: &str) {
     if let Err(e) = res {
         assert!(e.contains(text), "Expected {:?} to contain '{}'", e, text);
@@ -83,6 +89,15 @@ fn simple_surface() -> Surface {
     }
 }
 
+fn q2_surface() -> Surface {
+    Surface {
+        half_space: GOOD_HALF_SPACE,
+        texture: CString::new("T").unwrap(),
+        alignment: GOOD_ALIGNMENT,
+        q2ext: Q2_EXTENSION,
+    }
+}
+
 fn simple_brush() -> Brush {
     vec![
         simple_surface(),
@@ -92,10 +107,21 @@ fn simple_brush() -> Brush {
     ]
 }
 
+fn q2_brush() -> Brush {
+    vec![q2_surface(), q2_surface(), q2_surface(), q2_surface()]
+}
+
 fn simple_brush_entity() -> Entity {
     Entity {
         edict: simple_edict(),
         brushes: vec![simple_brush()],
+    }
+}
+
+fn q2_brush_entity() -> Entity {
+    Entity {
+        edict: simple_edict(),
+        brushes: vec![q2_brush()],
     }
 }
 
@@ -290,6 +316,16 @@ mod write {
         assert!(simple_map().write_to(&mut dest).is_ok());
         assert!(str::from_utf8(&dest).unwrap().contains("worldspawn"));
         assert!(str::from_utf8(&dest).unwrap().contains(" {FENCE "));
+    }
+
+    #[test]
+    fn write_q2_map() {
+        let mut dest = Vec::<u8>::new();
+        assert!(q2_brush_entity().write_to(&mut dest).is_ok());
+        let text = str::from_utf8(&dest).unwrap();
+        eprintln!("{}", &text);
+        assert!(text.contains("0 1 1 1237 -101 300"));
+        assert!(!text.contains("300."));
     }
 
     #[test]
