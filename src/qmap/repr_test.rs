@@ -1,24 +1,23 @@
 #[cfg(feature = "std")]
 extern crate std;
 
+extern crate alloc;
+
 use crate::qmap;
 use qmap::repr::*;
 
 use qmap::{CheckWritable, ValidationResult};
 
 #[cfg(feature = "std")]
-use {
-    crate::WriteError,
-    std::ffi::{CStr, CString},
-    std::str,
-    std::string::String,
-    std::vec::Vec,
-};
+use crate::WriteError;
 
-#[cfg(feature = "alloc_fills")]
-use {
-    alloc::ffi::CString, alloc::format, alloc::str, alloc::vec, core::ffi::CStr,
-};
+use {alloc::ffi::CString, alloc::str, core::ffi::CStr};
+
+#[cfg(feature = "std")]
+use {alloc::string::String, alloc::vec::Vec};
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, vec};
 
 const GOOD_AXES: [Vec3; 2] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
 
@@ -62,16 +61,16 @@ fn panic_expected_error() {
 
 fn simple_edict() -> Edict {
     let mut edict = Edict::new();
-    edict.insert(
+    edict.push((
         CString::new("classname").unwrap(),
         CString::new("worldspawn").unwrap(),
-    );
+    ));
     edict
 }
 
 fn bad_edict_key() -> Edict {
     let mut edict = Edict::new();
-    edict.insert(CString::new("\n").unwrap(), CString::new("oops").unwrap());
+    edict.push((CString::new("\n").unwrap(), CString::new("oops").unwrap()));
     edict
 }
 
@@ -174,7 +173,7 @@ fn check_bad_entities() {
         let key = CString::new(key).unwrap();
         let value = CString::new(value).unwrap();
         let mut edict = Edict::new();
-        edict.insert(key, value);
+        edict.push((key, value));
         let ent = Entity {
             edict,
             brushes: vec![],

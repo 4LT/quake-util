@@ -45,17 +45,21 @@ fn parse_good_bsp() {
 
     let qmap = parser.parse_entities().unwrap();
 
-    assert_eq!(
-        qmap.entities[0]
-            .edict
-            .get(&CString::new("classname").unwrap()),
-        Some(&CString::new("func_door").unwrap())
-    );
+    let (_, classname) = qmap.entities[0]
+        .edict
+        .iter()
+        .find(|(key, _)| key == &CString::new("classname").unwrap())
+        .unwrap();
 
-    assert_eq!(
-        qmap.entities[0].edict.get(&CString::new("model").unwrap()),
-        Some(&CString::new("*37").unwrap())
-    );
+    assert_eq!(classname, &CString::new("func_door").unwrap());
+
+    let (_, model) = qmap.entities[0]
+        .edict
+        .iter()
+        .find(|(key, _)| key == &CString::new("model").unwrap())
+        .unwrap();
+
+    assert_eq!(model, &CString::new("*37").unwrap());
 }
 
 #[test]

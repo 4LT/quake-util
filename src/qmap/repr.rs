@@ -1,22 +1,14 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "alloc_fills")]
 extern crate alloc;
 
 #[cfg(feature = "std")]
-use std::{
-    collections::HashMap,
-    ffi::{CStr, CString},
-    io,
-    string::String,
-    vec::Vec,
-};
+use std::io;
 
-#[cfg(feature = "alloc_fills")]
 use {
     alloc::ffi::CString, alloc::format, alloc::string::String, alloc::vec::Vec,
-    core::ffi::CStr, hashbrown::HashMap,
+    core::ffi::CStr,
 };
 
 #[cfg(feature = "std")]
@@ -66,6 +58,12 @@ impl QuakeMap {
             ent.write_to(writer)?;
         }
         Ok(())
+    }
+}
+
+impl Default for QuakeMap {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -149,7 +147,7 @@ impl CheckWritable for Entity {
 }
 
 /// Entity dictionary
-pub type Edict = HashMap<CString, CString>;
+pub type Edict = Vec<(CString, CString)>;
 
 impl CheckWritable for Edict {
     fn check_writable(&self) -> ValidationResult {

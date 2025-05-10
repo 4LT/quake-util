@@ -46,7 +46,9 @@ pub fn parse_mip_texture(
 pub fn parse_palette(reader: &mut impl Read) -> BinParseResult<Box<Palette>> {
     let mut bytes = [0u8; size_of::<Palette>()];
     reader.read_exact(&mut bytes[..])?;
-    Ok(Box::from(unsafe { transmute::<_, Palette>(bytes) }))
+    Ok(Box::from(unsafe {
+        transmute::<[u8; size_of::<Palette>()], Palette>(bytes)
+    }))
 }
 
 /// Attempt to parse a 2D image

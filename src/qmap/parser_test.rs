@@ -61,9 +61,9 @@ fn parse_point_entity_with_key_value() {
     assert_eq!(edict.len(), 1);
     assert_eq!(
         edict.iter().next().unwrap(),
-        (
-            &CString::new("classname").unwrap(),
-            &CString::new("light").unwrap()
+        &(
+            CString::new("classname").unwrap(),
+            CString::new("light").unwrap()
         )
     );
 }

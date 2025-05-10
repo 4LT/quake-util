@@ -35,11 +35,28 @@ fn main() {
     let mut map_name = String::from("<None>");
 
     for edict in qmap.entities.into_iter().map(|e| e.edict) {
-        let map_name_cstr = if edict.get(&CString::new("classname").unwrap())
+        let map_name_cstr = if edict
+            .iter()
+            .flat_map(|(key, value)| {
+                if key == &CString::new("classname").unwrap() {
+                    Some(value)
+                } else {
+                    None
+                }
+            })
+            .next()
             == Some(&CString::new("worldspawn").unwrap())
         {
             edict
-                .get(&CString::new("message").unwrap())
+                .iter()
+                .flat_map(|(key, value)| {
+                    if key == &CString::new("message").unwrap() {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                })
+                .next()
                 .map(Clone::clone)
         } else {
             None

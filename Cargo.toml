@@ -10,11 +10,7 @@ repository = "https://github.com/4LT/quake-util"
 
 [features]
 default = ["std"]
-alloc_fills = ["hashbrown"]
 std = []
-
-[dependencies]
-hashbrown = { version = "^0.14", optional = true }
 
 [dev-dependencies]
 benchmarking = "^0.4"

@@ -1,11 +1,5 @@
 #![no_std]
 
-#[cfg(all(not(feature = "std"), not(feature = "alloc_fills")))]
-compile_error!("Must use feature 'std' or 'alloc_fills'");
-
-#[cfg(all(feature = "std", feature = "alloc_fills"))]
-compile_error!("Features 'std' and 'alloc_fills' are mutually exclusive");
-
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;
