@@ -228,7 +228,9 @@ fn parse_directory(
             .name_to_string()
             .map_err(|e| BinParseError::Parse(e.to_string()))?;
 
-        if let MapEntry::Vacant(map_entry) = entries.entry(entry_name.clone()) {
+        if let MapEntry::Vacant(map_entry) =
+            entries.entry(entry_name.to_string())
+        {
             map_entry.insert(entry);
         } else {
             warnings

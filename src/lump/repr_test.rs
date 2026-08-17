@@ -1,7 +1,7 @@
 use super::kind;
 use super::{Image, Lump, MipTexture, MipTextureHead};
 use crate::error;
-use std::ffi::CString;
+use std::ffi::CStr;
 use std::mem::size_of;
 use std::string::String;
 
@@ -217,7 +217,10 @@ fn miptex_new_short_name() {
     let miptex = MipTexture::new(String::from("hi"), good_mips());
     assert_eq!(miptex.name(), *b"hi\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
     assert_eq!(miptex.name_to_string().unwrap(), String::from("hi"));
-    assert_eq!(miptex.name_to_cstring(), CString::new("hi").unwrap());
+    assert_eq!(
+        miptex.name_to_cstring(),
+        CStr::from_bytes_with_nul(b"hi\0").unwrap()
+    );
 }
 
 #[test]

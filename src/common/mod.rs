@@ -1,5 +1,3 @@
-use std::ffi::CString;
-
 mod ext_traits;
 
 pub use ext_traits::CellOptionExt;
@@ -42,18 +40,4 @@ impl<T: Copy + Default> core::fmt::Debug for Junk<T> {
     ) -> Result<(), core::fmt::Error> {
         Ok(())
     }
-}
-
-pub fn slice_to_cstring(slice: &[u8]) -> std::ffi::CString {
-    let mut len = 0;
-
-    while len < slice.len() {
-        if slice[len] == 0u8 {
-            break;
-        }
-
-        len += 1;
-    }
-
-    CString::new(&slice[..len]).unwrap()
 }

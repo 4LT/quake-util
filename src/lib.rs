@@ -14,9 +14,6 @@ mod common;
 pub use common::{Palette, QUAKE_PALETTE};
 
 #[cfg(feature = "std")]
-use common::slice_to_cstring;
-
-#[cfg(feature = "std")]
 pub mod lump;
 
 #[cfg(feature = "std")]

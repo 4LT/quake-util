@@ -1,6 +1,6 @@
 use super::repr::{Entry, EntryConfig, Head};
 use crate::error;
-use std::{ffi::CString, string::String};
+use std::ffi::CStr;
 
 #[test]
 fn construct_head() {
@@ -63,9 +63,9 @@ fn construct_entry() {
     assert_eq!(entry.kind(), expected_kind);
     assert_eq!(
         entry.name_to_cstring(),
-        CString::new(String::from("hello")).unwrap()
+        CStr::from_bytes_with_nul(b"hello\0").unwrap()
     );
-    assert_eq!(entry.name_to_string(), Ok(String::from("hello")));
+    assert_eq!(entry.name_to_string(), Ok("hello"));
 }
 
 #[test]
@@ -98,11 +98,6 @@ fn parse_good_entry() {
 fn parse_entry_bad_compression() {
     let mut bytes = [0; std::mem::size_of::<Entry>()];
     bytes[13] = 1u8;
-
     let err = Entry::try_from(bytes).unwrap_err();
-
-    match err {
-        error::BinParse::Parse(_) => {}
-        _ => panic!("Incorrect error type"),
-    }
+    assert!(matches!(err, error::BinParse::Parse(_)));
 }

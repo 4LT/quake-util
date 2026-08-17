@@ -1,9 +1,10 @@
-use std::ffi::{CString, IntoStringError};
+use std::ffi::CStr;
 use std::mem::size_of;
+use std::str::Utf8Error;
 use std::string::{String, ToString};
 
 use crate::common::Junk;
-use crate::{error, slice_to_cstring};
+use crate::error;
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
 
@@ -87,16 +88,14 @@ impl Entry {
         }
     }
 
-    /// Obtain the name as a C string.  If the name is not already
-    /// null-terminated (in which case the entry is not well-formed) a null byte
-    /// is appended to make a valid C string.
-    pub fn name_to_cstring(&self) -> CString {
-        slice_to_cstring(&self.name)
+    /// Obtain the name as a C string.
+    pub fn name_to_cstring(&self) -> &CStr {
+        CStr::from_bytes_until_nul(&self.name).expect("unterminated name")
     }
 
     /// Attempt to interpret the name as UTF-8 encoded string
-    pub fn name_to_string(&self) -> Result<String, IntoStringError> {
-        self.name_to_cstring().into_string()
+    pub fn name_to_string(&self) -> Result<&str, Utf8Error> {
+        self.name_to_cstring().to_str()
     }
 
     /// Name in raw bytes
