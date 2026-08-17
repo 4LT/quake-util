@@ -5,6 +5,7 @@ use std::string::{String, ToString};
 
 use crate::common::Junk;
 use crate::error;
+use crate::BinParseResult;
 
 pub const MAGIC: [u8; 4] = *b"WAD2";
 
@@ -76,8 +77,14 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub(crate) fn from_config(config: EntryConfig) -> Entry {
-        Entry {
+    pub(crate) fn from_config(config: EntryConfig) -> BinParseResult<Entry> {
+        let err_string =
+            "WAD entry name doesn't terminate after 15 characters".to_string();
+
+        CStr::from_bytes_until_nul(&config.name)
+            .map_err(|_| error::BinParse::Parse(err_string))?;
+
+        Ok(Entry {
             offset: config.offset,
             length: config.length,
             uncompressed_length: config.length,
@@ -85,7 +92,7 @@ impl Entry {
             compression: 0u8,
             _padding: Junk::default(),
             name: config.name,
-        }
+        })
     }
 
     /// Obtain the name as a C string.
@@ -156,12 +163,12 @@ impl TryFrom<[u8; size_of::<Entry>()]> for Entry {
 
         let name: [u8; 16] = rest[2..].try_into().unwrap();
 
-        Ok(Entry::from_config(EntryConfig {
+        Entry::from_config(EntryConfig {
             offset,
             length,
             lump_kind,
             name,
-        }))
+        })
     }
 }
 

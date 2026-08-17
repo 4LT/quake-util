@@ -55,7 +55,7 @@ fn construct_entry() {
         name: expected_name,
     };
 
-    let entry = Entry::from_config(config);
+    let entry = Entry::from_config(config).unwrap();
 
     assert_eq!(entry.name(), expected_name);
     assert_eq!(entry.offset(), expected_offset);
@@ -66,6 +66,18 @@ fn construct_entry() {
         CStr::from_bytes_with_nul(b"hello\0").unwrap()
     );
     assert_eq!(entry.name_to_string(), Ok("hello"));
+}
+
+#[test]
+fn construct_bad_entry() {
+    let config = EntryConfig {
+        offset: 2000,
+        length: 1000,
+        lump_kind: crate::lump::kind::MIPTEX,
+        name: [b'a'; 16],
+    };
+
+    assert!(matches!(Entry::from_config(config), Err(_)));
 }
 
 #[test]
