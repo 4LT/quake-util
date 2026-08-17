@@ -190,6 +190,33 @@ pub struct MipTextureHead {
     pub(crate) offsets: [u32; 4],
 }
 
+impl MipTextureHead {
+    /// Gets the miptex head as bytes
+    pub fn into_bytes(&self) -> [u8; size_of::<MipTextureHead>()] {
+        let mut bytes = [0; size_of::<MipTextureHead>()];
+        let mut byte_offset = 0usize;
+
+        bytes[..self.name.len()].copy_from_slice(&self.name);
+        byte_offset += self.name.len();
+
+        bytes[byte_offset..byte_offset + 4]
+            .copy_from_slice(&self.width.to_le_bytes());
+        byte_offset += 4;
+
+        bytes[byte_offset..byte_offset + 4]
+            .copy_from_slice(&self.height.to_le_bytes());
+        byte_offset += 4;
+
+        for offset_idx in 0usize..4 {
+            bytes[byte_offset..byte_offset + 4]
+                .copy_from_slice(&self.offsets[offset_idx].to_le_bytes());
+            byte_offset += 4;
+        }
+
+        bytes
+    }
+}
+
 impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
     type Error = error::BinParse;
 

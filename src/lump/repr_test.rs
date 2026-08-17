@@ -153,6 +153,13 @@ fn miptex_head_from_bytes() {
 }
 
 #[test]
+fn miptex_round_trip() {
+    let bytes = good_miptex_head_bytes();
+    let head: MipTextureHead = bytes.try_into().unwrap();
+    assert_eq!(head.into_bytes(), bytes);
+}
+
+#[test]
 fn miptex_head_bad_width() {
     let mut bytes = good_miptex_head_bytes();
     bytes[16..20].copy_from_slice(&(69_u32).to_le_bytes());
