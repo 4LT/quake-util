@@ -108,19 +108,30 @@ fn access_bad_mip_level() {
     miptex.mip(4);
 }
 
-#[test]
-fn miptex_mips() {
-    let images = [
+fn good_images() -> [Image; 4] {
+    [
         Image::from_pixels(384, Box::new([0u8; 3072 * 16])),
         Image::from_pixels(192, Box::new([0u8; 768 * 16])),
         Image::from_pixels(96, Box::new([0u8; 192 * 16])),
         Image::from_pixels(48, Box::new([0u8; 48 * 16])),
-    ];
+    ]
+}
+
+#[test]
+fn miptex_mips() {
+    let images = good_images();
     let miptex = MipTexture::from_parts([0u8; 16], images.clone());
 
     for (idx, mip) in miptex.mips().iter().enumerate() {
         assert_eq!(mip, &images[idx]);
     }
+}
+
+#[test]
+#[should_panic]
+fn miptex_bad_name() {
+    let name = [0x25_u8; 16];
+    MipTexture::from_parts(name, good_images());
 }
 
 const NAME: [u8; 16] = *b"SomeOldNameGame\0";
@@ -180,6 +191,14 @@ fn miptex_head_too_large() {
     let mut bytes = good_miptex_head_bytes();
     bytes[16..20].copy_from_slice(&(65_536_u32).to_le_bytes());
     bytes[20..24].copy_from_slice(&(65_536_u32).to_le_bytes());
+    let e = <MipTextureHead>::try_from(bytes).unwrap_err();
+    assert!(matches!(e, error::BinParse::Parse(_)));
+}
+
+#[test]
+fn miptex_head_name_unterminated() {
+    let mut bytes = good_miptex_head_bytes().clone();
+    bytes[15] = b'1';
     let e = <MipTextureHead>::try_from(bytes).unwrap_err();
     assert!(matches!(e, error::BinParse::Parse(_)));
 }

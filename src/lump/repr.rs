@@ -3,9 +3,13 @@ use crate::lump::kind;
 use crate::slice_to_cstring;
 use crate::Palette;
 use std::boxed::Box;
-use std::ffi::{CString, IntoStringError};
+use std::ffi::{CStr, CString, IntoStringError};
 use std::mem::size_of;
 use std::string::{String, ToString};
+use std::vec::Vec;
+
+const NAME_DOESNT_TERMINATE: &'static str =
+    "Texture name does not terminate after 15 characters";
 
 /// Enum w/ variants for each known lump kind
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -104,9 +108,14 @@ impl MipTexture {
     ///
     /// @ Panic
     ///
-    /// Will panic if mips are not valid.
+    /// Panics if mips are not valid or name is not null-terminated.
     pub fn from_parts(name: [u8; 16], mips: [Image; Self::MIP_COUNT]) -> Self {
         Self::validate_mips(&mips);
+
+        if let Err(_) = CStr::from_bytes_until_nul(&name) {
+            panic!("{}", NAME_DOESNT_TERMINATE);
+        }
+
         MipTexture { name, mips }
     }
 
@@ -178,6 +187,34 @@ impl MipTexture {
     pub fn mips(&self) -> &[Image] {
         &self.mips[..]
     }
+
+    /// Get the miptex as lump bytes
+    pub fn into_bytes(&self) -> Box<[u8]> {
+        let mut offsets = [0u32; Self::MIP_COUNT];
+        let mut cur_offset = size_of::<MipTextureHead>() as u32;
+
+        for offset_idx in 0..Self::MIP_COUNT {
+            offsets[offset_idx] = cur_offset;
+            cur_offset +=
+                self.mip(offset_idx).width * self.mip(offset_idx).height;
+        }
+
+        let head = MipTextureHead {
+            name: self.name,
+            width: self.mip(0).width,
+            height: self.mip(0).height,
+            offsets,
+        };
+
+        let mut bytes = Vec::with_capacity(cur_offset as usize);
+        bytes.extend_from_slice(&head.into_bytes());
+
+        for mip in self.mips() {
+            bytes.extend_from_slice(&mip.pixels);
+        }
+
+        bytes.into()
+    }
 }
 
 /// Lump header for mip-mapped textures
@@ -191,7 +228,7 @@ pub struct MipTextureHead {
 }
 
 impl MipTextureHead {
-    /// Gets the miptex head as bytes
+    /// Get the miptex head as lump bytes
     pub fn into_bytes(&self) -> [u8; size_of::<MipTextureHead>()] {
         let mut bytes = [0; size_of::<MipTextureHead>()];
         let mut byte_offset = 0usize;
@@ -222,6 +259,8 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
 
     /// Obtain header from a block of bytes as found in a miptex WAD lump.
     ///
+    /// Returns `Err` if name is not null-terminated.
+    ///
     /// Returns `Err` if width or height are not each divisible by 8, in which
     /// case valid mips cannot be generated.
     ///
@@ -230,6 +269,10 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
         bytes: [u8; size_of::<MipTextureHead>()],
     ) -> Result<Self, Self::Error> {
         let name = <[u8; 16]>::try_from(&bytes[..16]).unwrap();
+
+        CStr::from_bytes_until_nul(&name).map_err(|_| {
+            Self::Error::Parse(NAME_DOESNT_TERMINATE.to_string())
+        })?;
 
         let bytes = &bytes[16..];
 
@@ -242,14 +285,11 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
             u32::from_le_bytes(<[u8; 4]>::try_from(&bytes[..4]).unwrap());
 
         if width % 8 != 0 {
-            return Err(error::BinParse::Parse(format!(
-                "Invalid width {}",
-                width
-            )));
+            return Err(Self::Error::Parse(format!("Invalid width {}", width)));
         }
 
         if height % 8 != 0 {
-            return Err(error::BinParse::Parse(format!(
+            return Err(Self::Error::Parse(format!(
                 "Invalid height {}",
                 height
             )));
@@ -257,7 +297,7 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
 
         width
             .checked_mul(height)
-            .ok_or(error::BinParse::Parse("Texture too large".to_string()))?;
+            .ok_or(Self::Error::Parse("Texture too large".to_string()))?;
 
         let bytes = &bytes[4..];
 
