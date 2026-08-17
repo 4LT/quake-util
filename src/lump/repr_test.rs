@@ -195,9 +195,9 @@ fn miptex_new_short_name() {
 }
 
 #[test]
-fn miptex_new_long_name() {
-    let miptex = MipTexture::new(String::from("in_16_characters"), good_mips());
-    assert_eq!(miptex.name(), *b"in_16_characters");
+#[should_panic]
+fn miptex_16_byte_name() {
+    MipTexture::new(String::from("in_16_characters"), good_mips());
 }
 
 #[test]

@@ -115,10 +115,15 @@ impl MipTexture {
     ///
     /// @ Panic
     ///
-    /// Will panic if mips are not valid or `name` does not fit within 16 bytes.
+    /// Will panic if mips are not valid or `name` does not fit within 15 bytes.
     pub fn new(name: String, mips: [Image; Self::MIP_COUNT]) -> Self {
         let mut name_field = [0u8; 16];
         let name_bytes = &name.into_bytes();
+
+        if name_bytes.len() > 15 {
+            panic!("Texture name too large");
+        }
+
         name_field[..name_bytes.len()].copy_from_slice(name_bytes);
         let name = name_field;
         Self::validate_mips(&mips);
