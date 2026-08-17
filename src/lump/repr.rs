@@ -190,11 +190,10 @@ impl TryFrom<[u8; size_of::<MipTextureHead>()]> for MipTextureHead {
 
     /// Obtain header from a block of bytes as found in a miptex WAD lump.
     ///
-    /// # Panic
+    /// Returns `Err` if width or height are not each divisible by 8, in which
+    /// case valid mips cannot be generated.
     ///
-    /// Will panic if width or height are not each divisible by 8, in which case
-    /// valid mips cannot be generated.  Will panic if number of pixels in mip
-    /// 0 cannot fit within a `u32`.
+    /// Returns `Err` if number of pixels in mip 0 cannot fit within a `u32`.
     fn try_from(
         bytes: [u8; size_of::<MipTextureHead>()],
     ) -> Result<Self, Self::Error> {
