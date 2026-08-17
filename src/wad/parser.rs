@@ -14,19 +14,19 @@ use wad::repr::Head;
 /// WAD parser.  Wraps a mutable reference to a Read + Seek cursor to provide
 /// random read access.
 #[derive(Debug)]
-pub struct Parser<'a, Reader: Seek + Read> {
-    cursor: &'a mut Reader,
+pub struct Parser<Reader: Seek + Read> {
+    cursor: Reader,
     start: u64,
     directory: HashMap<String, wad::Entry>,
 }
 
-impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
+impl<Reader: Seek + Read> Parser<Reader> {
     /// Constructs a new wad parser starting at the provided cursor.  May
     /// produce a list of warnings for duplicate entriess (entries sharing the
     /// same name).
-    pub fn new(cursor: &'a mut Reader) -> BinParseResult<(Self, Vec<String>)> {
+    pub fn new(mut cursor: Reader) -> BinParseResult<(Self, Vec<String>)> {
         let start = cursor.stream_position().map_err(BinParseError::Io)?;
-        let (directory, warnings) = parse_directory(cursor, start)?;
+        let (directory, warnings) = parse_directory(&mut cursor, start)?;
 
         Ok((
             Self {
@@ -36,6 +36,14 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
             },
             warnings,
         ))
+    }
+
+    /// Seek to initial position and return reader
+    pub fn into_reader(mut self) -> Reader {
+        self.cursor
+            .seek(SeekFrom::Start(self.start))
+            .expect("failed to seek to initial position");
+        self.cursor
     }
 
     /// Clones WAD entries into a hash map.  Entries are used to access lumps
@@ -51,7 +59,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         entry: &wad::Entry,
     ) -> BinParseResult<lump::MipTexture> {
         self.seek_to_entry(entry)?;
-        lump::parse_mip_texture(self.cursor)
+        lump::parse_mip_texture(&mut self.cursor)
     }
 
     /// Attempts to parse a 2D at the offset provided by the entry
@@ -60,7 +68,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         entry: &wad::Entry,
     ) -> BinParseResult<lump::Image> {
         self.seek_to_entry(entry)?;
-        lump::parse_image(self.cursor)
+        lump::parse_image(&mut self.cursor)
     }
 
     /// Attempts to parse a 768 byte palette at the offset provided by the entry
@@ -69,7 +77,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         entry: &wad::Entry,
     ) -> BinParseResult<Box<Palette>> {
         self.seek_to_entry(entry)?;
-        lump::parse_palette(self.cursor)
+        lump::parse_palette(&mut self.cursor)
     }
 
     /// Attempts to read a number of bytes using the provided entry's length and
@@ -82,7 +90,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
         let length = usize::try_from(entry.length()).map_err(|_| {
             BinParseError::Parse("Length too large".to_string())
         })?;
-        lump::read_raw(self.cursor, length)
+        lump::read_raw(&mut self.cursor, length)
     }
 
     /// Attempts to read a lump based on the provided entry's name and lump
@@ -195,7 +203,7 @@ impl<'a, Reader: Seek + Read> Parser<'a, Reader> {
 }
 
 fn parse_directory(
-    cursor: &mut (impl Seek + Read),
+    mut cursor: impl Seek + Read,
     start: u64,
 ) -> BinParseResult<(HashMap<String, wad::Entry>, Vec<String>)> {
     let mut header_bytes = [0u8; size_of::<Head>()];
