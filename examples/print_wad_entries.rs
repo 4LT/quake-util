@@ -17,13 +17,10 @@ fn main() {
     let file = File::open(arg1).expect("Could not open file");
     let mut cursor = BufReader::new(file);
 
-    let (mut parser, warnings) = wad::Parser::new(&mut cursor).unwrap();
+    let mut parser = wad::Parser::new(&mut cursor).unwrap();
 
-    for warning in warnings {
-        eprintln!("Warning: {warning}");
-    }
-
-    for (name, entry) in parser.directory() {
+    for entry in parser.directory().to_vec() {
+        let name = entry.name_to_string().expect("Bad entry name").to_string();
         print!("Entry `{}`: ", name);
 
         match &parser

@@ -2,12 +2,10 @@ use crate::{lump, wad, BinParseError, BinParseResult, Palette};
 use io::{Read, Seek, SeekFrom};
 use lump::Lump;
 use std::boxed::Box;
-use std::collections::hash_map::Entry as MapEntry;
-use std::collections::HashMap;
 use std::io;
 use std::mem::size_of;
 use std::mem::size_of_val;
-use std::string::{String, ToString};
+use std::string::ToString;
 use std::vec::Vec;
 use wad::repr::Head;
 
@@ -17,25 +15,20 @@ use wad::repr::Head;
 pub struct Parser<Reader: Seek + Read> {
     cursor: Reader,
     start: u64,
-    directory: HashMap<String, wad::Entry>,
+    directory: Box<[wad::Entry]>,
 }
 
 impl<Reader: Seek + Read> Parser<Reader> {
-    /// Constructs a new wad parser starting at the provided cursor.  May
-    /// produce a list of warnings for duplicate entriess (entries sharing the
-    /// same name).
-    pub fn new(mut cursor: Reader) -> BinParseResult<(Self, Vec<String>)> {
+    /// Constructs a new wad parser starting at the provided cursor.
+    pub fn new(mut cursor: Reader) -> BinParseResult<Self> {
         let start = cursor.stream_position().map_err(BinParseError::Io)?;
-        let (directory, warnings) = parse_directory(&mut cursor, start)?;
+        let directory = parse_directory(&mut cursor, start)?;
 
-        Ok((
-            Self {
-                cursor,
-                start,
-                directory,
-            },
-            warnings,
-        ))
+        Ok(Self {
+            cursor,
+            start,
+            directory,
+        })
     }
 
     /// Seek to initial position and return reader
@@ -46,10 +39,9 @@ impl<Reader: Seek + Read> Parser<Reader> {
         self.cursor
     }
 
-    /// Clones WAD entries into a hash map.  Entries are used to access lumps
-    /// within the WAD.
-    pub fn directory(&self) -> HashMap<String, wad::Entry> {
-        self.directory.clone()
+    /// Table containing WAD entries by name
+    pub fn directory(&self) -> &[wad::Entry] {
+        &self.directory
     }
 
     /// Attempts to parse a mip-mapped texture at the offset provided by the
@@ -205,7 +197,7 @@ impl<Reader: Seek + Read> Parser<Reader> {
 fn parse_directory(
     mut cursor: impl Seek + Read,
     start: u64,
-) -> BinParseResult<(HashMap<String, wad::Entry>, Vec<String>)> {
+) -> BinParseResult<Box<[wad::Entry]>> {
     let mut header_bytes = [0u8; size_of::<Head>()];
     cursor.read_exact(&mut header_bytes[..])?;
     let header: Head = header_bytes.try_into()?;
@@ -220,31 +212,15 @@ fn parse_directory(
         .seek(SeekFrom::Start(dir_pos))
         .map_err(BinParseError::Io)?;
 
-    let mut entries = HashMap::<String, wad::Entry>::with_capacity(
-        entry_ct.try_into().unwrap(),
-    );
-
-    let mut warnings = Vec::new();
+    let mut entries = Vec::<_>::with_capacity(entry_ct.try_into().unwrap());
 
     for _ in 0..entry_ct {
         const WAD_ENTRY_SIZE: usize = size_of::<wad::Entry>();
         let mut entry_bytes = [0u8; WAD_ENTRY_SIZE];
         cursor.read_exact(&mut entry_bytes[0..WAD_ENTRY_SIZE])?;
         let entry: wad::Entry = entry_bytes.try_into()?;
-
-        let entry_name = entry
-            .name_to_string()
-            .map_err(|e| BinParseError::Parse(e.to_string()))?;
-
-        if let MapEntry::Vacant(map_entry) =
-            entries.entry(entry_name.to_string())
-        {
-            map_entry.insert(entry);
-        } else {
-            warnings
-                .push(format!("Skipping duplicate entry for `{entry_name}`"));
-        }
+        entries.push(entry);
     }
 
-    Ok((entries, warnings))
+    Ok(entries.into())
 }

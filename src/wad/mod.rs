@@ -8,8 +8,12 @@
 //! # let bytes = Vec::new();
 //! # let mut src = std::io::Cursor::new(bytes);
 //!
-//! if let Ok((mut parser, _warnings)) = wad::Parser::new(&mut src) {
-//!     for (entry_name, entry) in parser.directory() {
+//! if let Ok(mut parser) = wad::Parser::new(&mut src) {
+//!     let dir = parser.directory().to_vec();
+//!
+//!     for entry in dir {
+//!         let entry_name = entry.name_to_string().expect("bad name");
+//!
 //!         let kind = parser.parse_inferred(&entry).map(
 //!             |lump| lump.kind().to_string(),
 //!         ).unwrap_or(

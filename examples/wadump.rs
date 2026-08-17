@@ -22,13 +22,12 @@ mod main {
         let file = File::open(wad_path).expect("Could not open file");
         let mut reader = BufReader::new(file);
 
-        let (mut parser, warnings) = wad::Parser::new(&mut reader).unwrap();
+        let mut parser = wad::Parser::new(&mut reader).unwrap();
 
-        for warning in warnings {
-            eprintln!("Warning: {warning}");
-        }
+        for entry in parser.directory().to_vec() {
+            let name =
+                entry.name_to_string().expect("bad entry name").to_string();
 
-        for (name, entry) in parser.directory() {
             let lump = parser
                 .parse_inferred(&entry)
                 .map_err(|e| format!("`{}`: {}", name, e))

@@ -83,27 +83,6 @@ fn compressed_entry_bytes(offset: u32) -> Vec<u8> {
     entry
 }
 
-fn duplicate_entry_wad_bytes() -> Vec<u8> {
-    let mut wad = Vec::new();
-    let entry_count = 2u32;
-    let directory_offset = 12u32;
-    let name = *b"same_name\0\0\0\0\0\0\0";
-
-    wad.extend(b"WAD2");
-    wad.extend(entry_count.to_le_bytes());
-    wad.extend(directory_offset.to_le_bytes());
-
-    let entry1 =
-        entry_bytes(wad.len().try_into().unwrap(), 0, kind::FLAT, name);
-    wad.extend(entry1);
-
-    let entry2 =
-        entry_bytes(wad.len().try_into().unwrap(), 0, kind::FLAT, name);
-    wad.extend(entry2);
-
-    wad
-}
-
 fn good_wad_bytes() -> Vec<u8> {
     let mut wad = Vec::new();
     let image_name = *b"image\0\0\0\0\0\0\0\0\0\0\0";
@@ -182,16 +161,30 @@ fn good_wad_bytes() -> Vec<u8> {
 #[test]
 fn parse_good_wad() {
     let mut wad_file = Cursor::new(good_wad_bytes());
-    let (mut parser, warnings) = wad::Parser::new(&mut wad_file).unwrap();
-    let dir = parser.directory();
+    let mut parser = wad::Parser::new(&mut wad_file).unwrap();
+    let dir = parser.directory().to_vec();
     let panic_dir = || panic!("{:?}", dir);
-    let image_entry = dir.get("image").unwrap_or_else(panic_dir);
-    let miptex_entry = dir.get("miptex").unwrap_or_else(panic_dir);
-    let palette_entry = dir.get("palette").unwrap_or_else(panic_dir);
-    let flat_entry = dir.get("flat").unwrap_or_else(panic_dir);
-    let conchars_entry = dir.get("CONCHARS").unwrap_or_else(panic_dir);
+    let image_entry = dir
+        .iter()
+        .find(|e| e.name_to_string().expect("bad name") == "image")
+        .unwrap_or_else(panic_dir);
+    let miptex_entry = dir
+        .iter()
+        .find(|e| e.name_to_string().expect("bad name") == "miptex")
+        .unwrap_or_else(panic_dir);
+    let palette_entry = dir
+        .iter()
+        .find(|e| e.name_to_string().expect("bad name") == "palette")
+        .unwrap_or_else(panic_dir);
+    let flat_entry = dir
+        .iter()
+        .find(|e| e.name_to_string().expect("bad name") == "flat")
+        .unwrap_or_else(panic_dir);
+    let conchars_entry = dir
+        .iter()
+        .find(|e| e.name_to_string().expect("bad name") == "CONCHARS")
+        .unwrap_or_else(panic_dir);
 
-    assert_eq!(warnings.len(), 0);
     assert_eq!(image_entry.kind(), kind::SBAR);
     assert_eq!(miptex_entry.kind(), kind::MIPTEX);
     assert_eq!(palette_entry.kind(), kind::PALETTE);
@@ -239,8 +232,8 @@ fn parse_good_wad() {
         assert_eq!(flat_lump.len(), 123);
     }
 
-    for (entry_name, entry) in dir {
-        assert!(match &entry_name[..] {
+    for entry in dir {
+        assert!(match entry.name_to_string().unwrap() {
             "image" => matches!(
                 parser.parse_inferred(&entry).unwrap(),
                 Lump::StatusBar(_)
@@ -260,14 +253,6 @@ fn parse_good_wad() {
             name => panic!("Unexpected entry name `{name}`"),
         });
     }
-}
-
-#[test]
-fn parse_duplicate_entry() {
-    let mut wad_file = Cursor::new(duplicate_entry_wad_bytes());
-    let (_, warnings) = wad::Parser::new(&mut wad_file).unwrap();
-
-    assert_eq!(warnings.len(), 1);
 }
 
 #[test]
@@ -329,12 +314,12 @@ fn parse_bad_lumps() {
         ));
 
         let mut wad_file = Cursor::new(wad);
-        let (mut parser, _) = wad::Parser::new(&mut wad_file).unwrap();
+        let mut parser = wad::Parser::new(&mut wad_file).unwrap();
         let dir = parser.directory();
-        let entry = dir.get("BAD_BAD_BAD_BAD").unwrap();
+        let entry = dir[0];
 
         assert!(matches!(
-            parser.parse_inferred(entry),
+            parser.parse_inferred(&entry),
             Err(error::BinParse::Io(_))
         ));
     }
