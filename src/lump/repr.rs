@@ -102,7 +102,7 @@ impl MipTexture {
     /// Assemble a texture from provided mips with the given name.  Useful if
     /// name is already given by a WAD entry as a block of 16 bytes.
     ///
-    /// # Panic
+    /// @ Panic
     ///
     /// Will panic if mips are not valid.
     pub fn from_parts(name: [u8; 16], mips: [Image; Self::MIP_COUNT]) -> Self {
