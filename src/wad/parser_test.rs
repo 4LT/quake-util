@@ -166,23 +166,23 @@ fn parse_good_wad() {
     let panic_dir = || panic!("{:?}", dir);
     let image_entry = dir
         .iter()
-        .find(|e| e.name_to_string().expect("bad name") == "image")
+        .find(|e| e.name_to_str().expect("bad name") == "image")
         .unwrap_or_else(panic_dir);
     let miptex_entry = dir
         .iter()
-        .find(|e| e.name_to_string().expect("bad name") == "miptex")
+        .find(|e| e.name_to_str().expect("bad name") == "miptex")
         .unwrap_or_else(panic_dir);
     let palette_entry = dir
         .iter()
-        .find(|e| e.name_to_string().expect("bad name") == "palette")
+        .find(|e| e.name_to_str().expect("bad name") == "palette")
         .unwrap_or_else(panic_dir);
     let flat_entry = dir
         .iter()
-        .find(|e| e.name_to_string().expect("bad name") == "flat")
+        .find(|e| e.name_to_str().expect("bad name") == "flat")
         .unwrap_or_else(panic_dir);
     let conchars_entry = dir
         .iter()
-        .find(|e| e.name_to_string().expect("bad name") == "CONCHARS")
+        .find(|e| e.name_to_str().expect("bad name") == "CONCHARS")
         .unwrap_or_else(panic_dir);
 
     assert_eq!(image_entry.kind(), kind::SBAR);
@@ -233,7 +233,7 @@ fn parse_good_wad() {
     }
 
     for entry in dir {
-        assert!(match entry.name_to_string().unwrap() {
+        assert!(match entry.name_to_str().unwrap() {
             "image" => matches!(
                 parser.parse_inferred(&entry).unwrap(),
                 Lump::StatusBar(_)

@@ -216,9 +216,9 @@ fn good_mips() -> [Image; 4] {
 fn miptex_new_short_name() {
     let miptex = MipTexture::new(String::from("hi"), good_mips());
     assert_eq!(miptex.name(), *b"hi\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
-    assert_eq!(miptex.name_to_string().unwrap(), String::from("hi"));
+    assert_eq!(miptex.name_to_str().unwrap(), String::from("hi"));
     assert_eq!(
-        miptex.name_to_cstring(),
+        miptex.name_to_cstr(),
         CStr::from_bytes_with_nul(b"hi\0").unwrap()
     );
 }

@@ -20,7 +20,7 @@ fn main() {
     let mut parser = wad::Parser::new(&mut cursor).unwrap();
 
     for entry in parser.directory().to_vec() {
-        let name = entry.name_to_string().expect("Bad entry name").to_string();
+        let name = entry.name_to_str().expect("Bad entry name").to_string();
         print!("Entry `{}`: ", name);
 
         match &parser

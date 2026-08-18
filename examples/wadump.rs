@@ -25,8 +25,7 @@ mod main {
         let mut parser = wad::Parser::new(&mut reader).unwrap();
 
         for entry in parser.directory().to_vec() {
-            let name =
-                entry.name_to_string().expect("bad entry name").to_string();
+            let name = entry.name_to_str().expect("bad entry name").to_string();
 
             let lump = parser
                 .parse_inferred(&entry)

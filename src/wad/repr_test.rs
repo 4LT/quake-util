@@ -62,10 +62,10 @@ fn construct_entry() {
     assert_eq!(entry.length(), expected_length);
     assert_eq!(entry.kind(), expected_kind);
     assert_eq!(
-        entry.name_to_cstring(),
+        entry.name_to_cstr(),
         CStr::from_bytes_with_nul(b"hello\0").unwrap()
     );
-    assert_eq!(entry.name_to_string(), Ok("hello"));
+    assert_eq!(entry.name_to_str(), Ok("hello"));
 }
 
 #[test]

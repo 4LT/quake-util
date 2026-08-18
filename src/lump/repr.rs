@@ -157,13 +157,13 @@ impl MipTexture {
     /// Obtain the name as a C string.  If the name is not already
     /// null-terminated (in which case the entry is not well-formed) a null byte
     /// is appended to make a valid C string.
-    pub fn name_to_cstring(&self) -> &CStr {
+    pub fn name_to_cstr(&self) -> &CStr {
         CStr::from_bytes_until_nul(&self.name).expect("unterminated name")
     }
 
     /// Attempt to interpret the name as UTF-8 encoded string
-    pub fn name_to_string(&self) -> Result<&str, Utf8Error> {
-        self.name_to_cstring().to_str()
+    pub fn name_to_str(&self) -> Result<&str, Utf8Error> {
+        self.name_to_cstr().to_str()
     }
 
     pub fn name(&self) -> [u8; 16] {

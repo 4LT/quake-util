@@ -12,7 +12,7 @@
 //!     let dir = parser.directory().to_vec();
 //!
 //!     for entry in dir {
-//!         let entry_name = entry.name_to_string().expect("bad name");
+//!         let entry_name = entry.name_to_str().expect("bad name");
 //!
 //!         let kind = parser.parse_inferred(&entry).map(
 //!             |lump| lump.kind().to_string(),
