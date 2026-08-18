@@ -154,9 +154,7 @@ impl MipTexture {
         }
     }
 
-    /// Obtain the name as a C string.  If the name is not already
-    /// null-terminated (in which case the entry is not well-formed) a null byte
-    /// is appended to make a valid C string.
+    /// Obtain the name as a C string
     pub fn name_to_cstr(&self) -> &CStr {
         CStr::from_bytes_until_nul(&self.name).expect("unterminated name")
     }
